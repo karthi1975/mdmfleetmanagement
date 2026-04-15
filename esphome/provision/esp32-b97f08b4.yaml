@@ -1,0 +1,56 @@
+# Auto-generated from templates/room_sensor.yaml.j2
+# DO NOT EDIT — re-render via fleet API /provisioning/provision
+
+substitutions:
+  device_name: "esp32-b97f08b4"
+  device_role: "room_sensor"
+  firmware_version: "1.0.0"
+  fleet_url: "http://192.168.1.231:8000"
+  provision_token: "Bf6ZJSJlmzteomrkKW-LREO8zpDErzRvk1cxfn8n0Ik"
+
+esphome:
+  name: ${device_name}
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+  level: INFO
+
+# WiFi: user enters SSID/password via captive portal on first boot.
+wifi:
+  ap:
+    ssid: "${device_name}-setup"
+    password: "setupme123"
+
+captive_portal:
+
+# OTA: HTTP-pull from fleet server using device-specific URL + token header.
+ota:
+  - platform: http_request
+    id: ota_http
+
+http_request:
+  verify_ssl: false
+
+# Periodic OTA poll — every 6h. Token sent in header for auth.
+interval:
+  - interval: 6h
+    then:
+      - http_request.get:
+          url: "${fleet_url}/api/ota/check?device_id=${device_name}"
+          headers:
+            X-Device-Token: "${provision_token}"
+          on_response:
+            then:
+              - logger.log: "OTA check completed"
+
+sensor:
+  - platform: uptime
+    name: "${device_name} Uptime"
+    update_interval: 60s
+  - platform: wifi_signal
+    name: "${device_name} WiFi RSSI"
+    update_interval: 60s

@@ -1,0 +1,151 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fleet_db}
+      POSTGRES_USER: ${POSTGRES_USER:-fleet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fleet_secret}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fleet} -d ${POSTGRES_DB:-fleet_db}"]
+      interval: 5s
+      retries: 5
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data/firmware:/usr/share/nginx/firmware:ro
+    depends_on:
+      - fleet-api
+
+  fleet-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-fleet}:${POSTGRES_PASSWORD:-fleet_secret}@postgres:5432/${POSTGRES_DB:-fleet_db}
+      DATABASE_URL_SYNC: postgresql+psycopg2://${POSTGRES_USER:-fleet}:${POSTGRES_PASSWORD:-fleet_secret}@postgres:5432/${POSTGRES_DB:-fleet_db}
+      MQTT_BROKER: mosquitto
+      HOST_PROJECT_DIR: ${HOST_PROJECT_DIR:-${PWD}}
+      ESPHOME_IMAGE: ${ESPHOME_IMAGE:-esphome/esphome:2024.12.4}
+      FIRMWARE_STORAGE_PATH: /data/firmware
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    volumes:
+      - ./fleet_server:/app/fleet_server
+      - ./data/firmware:/data/firmware
+      - ./esphome:/app/esphome
+      - ./docker-compose.yml:/app/docker-compose.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /app
+
+  esphome:
+    image: esphome/esphome:2024.12.4
+    ports:
+      - "6052:6052"
+    environment:
+      ESPHOME_DASHBOARD_USE_PING: "true"
+      USERNAME: ${ESPHOME_USERNAME:-admin}
+      PASSWORD: ${ESPHOME_PASSWORD:-change_me}
+    volumes:
+      - ./esphome:/config
+      - esphome_cache:/cache
+      - ./data/firmware:/config/build/firmware_out
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:2.9.0
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki-config.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+
+  grafana:
+    image: grafana/grafana-oss:10.4.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_UNIFIED_ALERTING_ENABLED: "true"
+      GF_AUTH_LOGIN_COOKIE_NAME: "smarthome_session"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/etc/grafana/provisioning/dashboards/json/fleet-overview.json"
+      GF_USERS_DEFAULT_THEME: "light"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/provisioning:/etc/grafana/provisioning
+      # SmartHome branding — replaces ALL Grafana logos + backgrounds
+      # Icons
+      - ./monitoring/grafana-branding/fav32.png:/usr/share/grafana/public/img/fav32.png
+      - ./monitoring/grafana-branding/apple-touch-icon.png:/usr/share/grafana/public/img/apple-touch-icon.png
+      - ./monitoring/grafana-branding/mstile-150x150.png:/usr/share/grafana/public/img/mstile-150x150.png
+      - ./monitoring/grafana-branding/grafanaconline.png:/usr/share/grafana/public/img/grafanaconline.png
+      # Logos
+      - ./monitoring/grafana-branding/logo_transparent_400x.png:/usr/share/grafana/public/img/logo_transparent_400x.png
+      - ./monitoring/grafana-branding/logo_transparent_200x.png:/usr/share/grafana/public/img/logo_transparent_200x.png
+      - ./monitoring/grafana-branding/logo_transparent_200x75.png:/usr/share/grafana/public/img/logo_transparent_200x75.png
+      # SVG icons
+      - ./monitoring/grafana-branding/grafana_icon.svg:/usr/share/grafana/public/img/grafana_icon.svg
+      - ./monitoring/grafana-branding/grafana_mask_icon.svg:/usr/share/grafana/public/img/grafana_mask_icon.svg
+      - ./monitoring/grafana-branding/grafana_mask_icon_white.svg:/usr/share/grafana/public/img/grafana_mask_icon_white.svg
+      - ./monitoring/grafana-branding/grafana_com_auth_icon.svg:/usr/share/grafana/public/img/grafana_com_auth_icon.svg
+      # SVG text logos
+      - ./monitoring/grafana-branding/grafana_typelogo.svg:/usr/share/grafana/public/img/grafana_typelogo.svg
+      - ./monitoring/grafana-branding/grafana_text_logo-dark.svg:/usr/share/grafana/public/img/grafana_text_logo-dark.svg
+      - ./monitoring/grafana-branding/grafana_text_logo-light.svg:/usr/share/grafana/public/img/grafana_text_logo-light.svg
+      - ./monitoring/grafana-branding/grafana_text_logo_dark.svg:/usr/share/grafana/public/img/grafana_text_logo_dark.svg
+      - ./monitoring/grafana-branding/grafana_text_logo_light.svg:/usr/share/grafana/public/img/grafana_text_logo_light.svg
+      - ./monitoring/grafana-branding/grafana_net_logo.svg:/usr/share/grafana/public/img/grafana_net_logo.svg
+      - ./monitoring/grafana-branding/grafana_enterprise_typelogo.svg:/usr/share/grafana/public/img/grafana_enterprise_typelogo.svg
+      # Login backgrounds — translucent blue
+      - ./monitoring/grafana-branding/login_background_dark.svg:/usr/share/grafana/public/img/login_background_dark.svg
+      - ./monitoring/grafana-branding/login_background_light.svg:/usr/share/grafana/public/img/login_background_light.svg
+      - ./monitoring/grafana-branding/g8_login_dark.svg:/usr/share/grafana/public/img/g8_login_dark.svg
+      - ./monitoring/grafana-branding/g8_login_light.svg:/usr/share/grafana/public/img/g8_login_light.svg
+      # Custom CSS — SmartHome branding overrides (replaces login icon, text, background)
+      - ./monitoring/grafana-branding/grafana.light.css:/usr/share/grafana/public/build/grafana.light.b8b3904788f25480f4a1.css
+      # Config
+      - ./monitoring/grafana-branding/grafana.ini:/etc/grafana/grafana.ini
+    depends_on:
+      - loki
+      - postgres
+
+  rsyslog:
+    image: rsyslog/syslog_appliance_alpine
+    ports:
+      - "514:514/udp"
+    volumes:
+      - ./monitoring/rsyslog.conf:/etc/rsyslog.d/50-default.conf
+      - rsyslog_logs:/var/log/fleet
+
+volumes:
+  pgdata:
+  mosquitto_data:
+  mosquitto_log:
+  loki_data:
+  grafana_data:
+  rsyslog_logs:
+  esphome_cache:

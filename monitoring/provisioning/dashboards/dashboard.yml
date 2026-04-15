@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: Fleet Management
+    folder: Fleet
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json
+      foldersFromFilesStructure: false

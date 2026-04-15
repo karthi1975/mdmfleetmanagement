@@ -1,0 +1,876 @@
+{
+  "uid": "fleet-overview",
+  "title": "SmartHome \u2014 ESP32 Fleet Management | Tetradapt LLC",
+  "tags": [
+    "fleet",
+    "esp32",
+    "iot",
+    "smarthome",
+    "tetradapt"
+  ],
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "10s",
+  "templating": {
+    "list": [
+      {
+        "name": "status_filter",
+        "type": "custom",
+        "label": "Status Filter",
+        "current": {
+          "text": "All",
+          "value": ""
+        },
+        "options": [
+          {
+            "text": "All",
+            "value": "",
+            "selected": true
+          },
+          {
+            "text": "Alive",
+            "value": "alive",
+            "selected": false
+          },
+          {
+            "text": "Dead",
+            "value": "dead",
+            "selected": false
+          },
+          {
+            "text": "Unknown",
+            "value": "unknown",
+            "selected": false
+          }
+        ],
+        "query": "alive,dead,unknown"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "title": "Total Devices",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#A8C7FA"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "#A8C7FA",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "graphMode": "none",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT count(*) AS \"Total\" FROM devices;",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Alive",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#4caf50"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "#4caf50",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "graphMode": "none",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT count(*) AS \"Alive\" FROM devices WHERE status = 'alive';",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Dead",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#f44336"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "#f44336",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "graphMode": "none",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT count(*) AS \"Dead\" FROM devices WHERE status = 'dead';",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Unknown",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#ff9800"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "#ff9800",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "graphMode": "none",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT count(*) AS \"Unknown\" FROM devices WHERE status = 'unknown';",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Status Distribution",
+      "type": "piechart",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right"
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "alive"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#4caf50",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "dead"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#f44336",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "unknown"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#ff9800",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT status, count(*) AS count FROM devices GROUP BY status;",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Firmware Distribution",
+      "type": "piechart",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right"
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT firmware_version, count(*) AS count FROM devices GROUP BY firmware_version ORDER BY count DESC;",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Fleet Devices (Req 1: Report & display current fleet code levels)",
+      "type": "table",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "status"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "alive": {
+                        "text": "ALIVE",
+                        "color": "#4caf50"
+                      }
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "options": {
+                      "dead": {
+                        "text": "DEAD",
+                        "color": "#f44336"
+                      }
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "options": {
+                      "unknown": {
+                        "text": "UNKNOWN",
+                        "color": "#ff9800"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "rssi"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dBm"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "heap"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "uptime"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "last_seen",
+            "desc": true
+          }
+        ]
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT d.device_id, d.status, d.firmware_version, d.role, d.mac, d.rssi, d.heap, d.uptime, d.home_id, d.last_seen FROM devices d WHERE ('${status_filter}' = '' OR d.status = '${status_filter}') ORDER BY d.last_seen DESC NULLS LAST;",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Health Monitor (Req 2: Monitor fleet for alive/dead conditions)",
+      "type": "row",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "title": "Avg RSSI (alive devices)",
+      "type": "gauge",
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 0,
+        "y": 14
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dBm",
+          "min": -100,
+          "max": 0,
+          "thresholds": {
+            "steps": [
+              {
+                "color": "#f44336",
+                "value": null
+              },
+              {
+                "color": "#ff9800",
+                "value": -80
+              },
+              {
+                "color": "#4caf50",
+                "value": -60
+              }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT ROUND(AVG(rssi)) AS \"Avg RSSI\" FROM devices WHERE status = 'alive' AND rssi IS NOT NULL;",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Avg Free Heap (alive devices)",
+      "type": "gauge",
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 4,
+        "y": 14
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decbytes",
+          "min": 0,
+          "max": 300000,
+          "thresholds": {
+            "steps": [
+              {
+                "color": "#f44336",
+                "value": null
+              },
+              {
+                "color": "#ff9800",
+                "value": 20000
+              },
+              {
+                "color": "#4caf50",
+                "value": 50000
+              }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT ROUND(AVG(heap)) AS \"Avg Heap\" FROM devices WHERE status = 'alive' AND heap IS NOT NULL;",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Dead Devices (Req 2)",
+      "type": "table",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 14
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left"
+          }
+        }
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT device_id, home_id, firmware_version, last_seen, EXTRACT(EPOCH FROM (now() - last_seen))::int AS dead_seconds FROM devices WHERE status = 'dead' ORDER BY last_seen DESC;",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Devices Per Home",
+      "type": "barchart",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 14
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "options": {
+        "orientation": "horizontal"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT COALESCE(h.patient_name, 'Unassigned') AS home, count(d.device_id) AS devices FROM devices d LEFT JOIN homes h ON d.home_id = h.home_id GROUP BY h.patient_name ORDER BY devices DESC;",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Community Membership",
+      "type": "table",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT c.community_id, c.name, count(hc.home_id) AS homes FROM communities c LEFT JOIN home_community hc ON c.community_id = hc.community_id GROUP BY c.community_id, c.name ORDER BY homes DESC;",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Recent Audit Log",
+      "type": "table",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT created_at, user_id, action, resource, details::text FROM audit_log ORDER BY created_at DESC LIMIT 20;",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Central Logging (Req 3)",
+      "type": "row",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "title": "Device Logs (Loki)",
+      "type": "logs",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": ""
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "expr": "{job=\"fleet\"} |= ``",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "OTA & Broadcasts (Req 4)",
+      "type": "row",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "title": "Firmware Versions Available",
+      "type": "table",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 36
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT version, checksum, release_notes, created_at FROM firmware_versions ORDER BY created_at DESC;",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Recent OTA Events",
+      "type": "table",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 36
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "fieldConfig": {
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "status"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "success": {
+                        "text": "SUCCESS",
+                        "color": "#4caf50"
+                      }
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "options": {
+                      "failed": {
+                        "text": "FAILED",
+                        "color": "#f44336"
+                      }
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "options": {
+                      "pending": {
+                        "text": "PENDING",
+                        "color": "#ff9800"
+                      }
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "options": {
+                      "cancelled": {
+                        "text": "CANCELLED",
+                        "color": "#9e9e9e"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT device_id, from_version, to_version, status, started_at, completed_at FROM ota_events ORDER BY started_at DESC LIMIT 20;",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Recent Broadcasts (FCM Push)",
+      "type": "table",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 42
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT b.id, c.name AS community, b.message, b.priority, b.type, b.sent_at, b.sent_by FROM broadcasts b JOIN communities c ON b.community_id = c.community_id ORDER BY b.created_at DESC LIMIT 20;",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Broadcast Delivery Stats",
+      "type": "table",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 42
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT b.id, b.message, count(ba.id) AS acks, b.sent_at FROM broadcasts b LEFT JOIN broadcast_acks ba ON b.id = ba.broadcast_id GROUP BY b.id, b.message, b.sent_at ORDER BY b.sent_at DESC NULLS LAST LIMIT 20;",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

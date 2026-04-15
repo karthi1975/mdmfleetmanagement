@@ -1,0 +1,50 @@
+"""Firmware upload and listing API."""
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from fleet_server.database import get_db
+from fleet_server.schemas.firmware import FirmwareResponse
+from fleet_server.services.firmware import FirmwareService
+
+router = APIRouter()
+
+
+def get_service(db: AsyncSession = Depends(get_db)) -> FirmwareService:
+    return FirmwareService(db)
+
+
+@router.post("/", response_model=FirmwareResponse, status_code=201)
+async def upload_firmware(
+    version: str = Form(...),
+    release_notes: str = Form(""),
+    file: UploadFile = File(...),
+    service: FirmwareService = Depends(get_service),
+):
+    existing = await service.get_by_version(version)
+    if existing:
+        raise HTTPException(status_code=409, detail="Version already exists")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Empty file")
+
+    return await service.upload(version, content, release_notes)
+
+
+@router.get("/", response_model=list[FirmwareResponse])
+async def list_firmware(
+    service: FirmwareService = Depends(get_service),
+):
+    return await service.get_all()
+
+
+@router.get("/{version}", response_model=FirmwareResponse)
+async def get_firmware(
+    version: str,
+    service: FirmwareService = Depends(get_service),
+):
+    fw = await service.get_by_version(version)
+    if not fw:
+        raise HTTPException(status_code=404, detail="Version not found")
+    return fw

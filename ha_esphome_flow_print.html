@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ESP32 Fleet — Three Separate Services</title>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  @page { size: 297mm 210mm; margin: 10mm 10mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Roboto', system-ui, sans-serif; background: #121212; color: #E6E0E9; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { width: 277mm; height: 190mm; max-height: 190mm; overflow: hidden; margin: 0 auto; padding: 10px 14px; page-break-after: always; page-break-inside: avoid; background: #121212; }
+  .page:last-child { page-break-after: auto; }
+  h1 { font-family: 'Google Sans', sans-serif; text-align: center; font-size: 17px; font-weight: 500; color: #E6E0E9; margin-bottom: 3px; }
+  .subtitle { text-align: center; color: #938F99; font-size: 10px; margin-bottom: 8px; }
+  h2 { font-family: 'Google Sans', sans-serif; font-size: 13px; font-weight: 500; margin: 8px 0 4px; padding: 4px 10px; border-radius: 8px; display: inline-block; }
+  svg { display: block; margin: 0 auto; }
+  .footer { text-align: center; font-size: 7.5px; color: #49454F; margin-top: 4px; border-top: 1px solid #2B2930; padding-top: 3px; }
+  .t-title { font-family: 'Google Sans', sans-serif; fill: #E6E0E9; font-size: 13px; font-weight: 500; }
+  .t-label { font-family: 'Roboto', sans-serif; fill: #E6E0E9; font-size: 11px; font-weight: 500; }
+  .t-body { font-family: 'Roboto', sans-serif; fill: #CAC4D0; font-size: 9.5px; }
+  .t-small { font-family: 'Roboto', sans-serif; fill: #938F99; font-size: 8.5px; }
+  .t-mono { font-family: 'Roboto Mono', monospace; fill: #CAC4D0; font-size: 8.5px; }
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 9px; margin: 4px 0; }
+  th { font-family: 'Roboto', sans-serif; font-weight: 500; font-size: 8px; letter-spacing: 1px; text-transform: uppercase; padding: 3px 6px; text-align: left; color: #938F99; border-bottom: 1px solid #49454F; }
+  td { padding: 3px 6px; border-bottom: 1px solid #2B2930; color: #CAC4D0; vertical-align: top; line-height: 1.35; }
+  tr:last-child td { border-bottom: none; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ PAGE 1: THREE SEPARATE SERVICES ═══════════════ -->
+<div class="page">
+  <h1>Three Separate Services — Clear Boundaries</h1>
+  <p class="subtitle">Each service is independent: different protocol, different purpose, different client</p>
+
+  <svg width="1040" height="560" viewBox="0 0 1060 570">
+    <defs>
+      <marker id="ab" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#A8C7FA"/></marker>
+      <marker id="ag" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#7DCFB6"/></marker>
+      <marker id="ap" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#D0BCFF"/></marker>
+      <marker id="ay" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#E2C87E"/></marker>
+      <marker id="ar" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#F2B8B5"/></marker>
+    </defs>
+
+    <!-- ═══ TITLE BAR: 3 SERVICES ═══ -->
+    <rect x="20" y="5" width="330" height="30" rx="8" style="fill:#1D2133;stroke:#A8C7FA;stroke-width:1.5;"/>
+    <text x="185" y="24" text-anchor="middle" class="t-label" style="fill:#A8C7FA;">SERVICE 1: Fleet Management (MQTT)</text>
+
+    <rect x="365" y="5" width="330" height="30" rx="8" style="fill:#1E2B1E;stroke:#7DCFB6;stroke-width:1.5;"/>
+    <text x="530" y="24" text-anchor="middle" class="t-label" style="fill:#7DCFB6;">SERVICE 2: Home Control (ESPHome API)</text>
+
+    <rect x="710" y="5" width="330" height="30" rx="8" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:1.5;"/>
+    <text x="875" y="24" text-anchor="middle" class="t-label" style="fill:#D0BCFF;">SERVICE 3: Broadcast (REST Pub/Sub)</text>
+
+    <!-- ═══ SERVICE 1: FLEET MANAGEMENT ═══ -->
+    <rect x="20" y="45" width="330" height="235" rx="10" style="fill:#1D2133;stroke:#A8C7FA;stroke-width:1;"/>
+    <text x="185" y="65" text-anchor="middle" class="t-title" style="fill:#A8C7FA;">Fleet Management</text>
+    <text x="185" y="80" text-anchor="middle" class="t-small" style="fill:#A8C7FA;">Protocol: MQTT :1883</text>
+
+    <text x="40" y="100" class="t-body" style="fill:#A8C7FA;">Server: Fleet Server (Docker)</text>
+    <text x="40" y="118" class="t-body" style="fill:#A8C7FA;">Client: ESP32 devices</text>
+
+    <rect x="40" y="130" width="145" height="35" rx="6" style="fill:#24283D;stroke:#7CACF8;stroke-width:0.8;"/>
+    <text x="113" y="147" text-anchor="middle" class="t-body" style="fill:#A8C7FA;">Heartbeat 30s</text>
+    <text x="113" y="160" text-anchor="middle" class="t-small">uptime, heap, rssi</text>
+
+    <rect x="195" y="130" width="140" height="35" rx="6" style="fill:#24283D;stroke:#7CACF8;stroke-width:0.8;"/>
+    <text x="265" y="147" text-anchor="middle" class="t-body" style="fill:#A8C7FA;">Auto-Register</text>
+    <text x="265" y="160" text-anchor="middle" class="t-small">MAC, version, role</text>
+
+    <rect x="40" y="175" width="145" height="35" rx="6" style="fill:#24283D;stroke:#7CACF8;stroke-width:0.8;"/>
+    <text x="113" y="192" text-anchor="middle" class="t-body" style="fill:#A8C7FA;">OTA Commands</text>
+    <text x="113" y="205" text-anchor="middle" class="t-small">firmware push</text>
+
+    <rect x="195" y="175" width="140" height="35" rx="6" style="fill:#24283D;stroke:#7CACF8;stroke-width:0.8;"/>
+    <text x="265" y="192" text-anchor="middle" class="t-body" style="fill:#A8C7FA;">Dead Detection</text>
+    <text x="265" y="205" text-anchor="middle" class="t-small">90s timeout → alert</text>
+
+    <text x="185" y="235" text-anchor="middle" class="t-small">Stored in: PostgreSQL + Grafana</text>
+    <text x="185" y="250" text-anchor="middle" class="t-small" style="fill:#A8C7FA;">ESP32 → MQTT → Fleet API → DB</text>
+    <text x="185" y="270" text-anchor="middle" class="t-small" style="fill:#938F99;"></text>
+
+    <!-- ═══ SERVICE 2: HOME CONTROL ═══ -->
+    <rect x="365" y="45" width="330" height="235" rx="10" style="fill:#1E2B1E;stroke:#7DCFB6;stroke-width:1;"/>
+    <text x="530" y="65" text-anchor="middle" class="t-title" style="fill:#7DCFB6;">Home Assistant Control</text>
+    <text x="530" y="80" text-anchor="middle" class="t-small" style="fill:#7DCFB6;">Protocol: ESPHome Native API :6053</text>
+
+    <text x="385" y="100" class="t-body" style="fill:#7DCFB6;">Server: HA Server (HA VM)</text>
+    <text x="385" y="118" class="t-body" style="fill:#7DCFB6;">Client: ESP32 devices</text>
+
+    <rect x="385" y="130" width="145" height="35" rx="6" style="fill:#152620;stroke:#5DB391;stroke-width:0.8;"/>
+    <text x="458" y="147" text-anchor="middle" class="t-body" style="fill:#7DCFB6;">Sensor Data</text>
+    <text x="458" y="160" text-anchor="middle" class="t-small">temp, motion, door</text>
+
+    <rect x="540" y="130" width="140" height="35" rx="6" style="fill:#152620;stroke:#5DB391;stroke-width:0.8;"/>
+    <text x="610" y="147" text-anchor="middle" class="t-body" style="fill:#7DCFB6;">Device Control</text>
+    <text x="610" y="160" text-anchor="middle" class="t-small">lights, switches</text>
+
+    <rect x="385" y="175" width="145" height="35" rx="6" style="fill:#152620;stroke:#5DB391;stroke-width:0.8;"/>
+    <text x="458" y="192" text-anchor="middle" class="t-body" style="fill:#7DCFB6;">Automations</text>
+    <text x="458" y="205" text-anchor="middle" class="t-small">fall alert, emergency</text>
+
+    <rect x="540" y="175" width="140" height="35" rx="6" style="fill:#152620;stroke:#5DB391;stroke-width:0.8;"/>
+    <text x="610" y="192" text-anchor="middle" class="t-body" style="fill:#7DCFB6;">OTA from HA</text>
+    <text x="610" y="205" text-anchor="middle" class="t-small">ESPHome add-on</text>
+
+    <text x="530" y="235" text-anchor="middle" class="t-small">Real-time: &lt;50ms, auto-discovery via mDNS</text>
+    <text x="530" y="250" text-anchor="middle" class="t-small" style="fill:#7DCFB6;">ESP32 → Native API → HA → Automation</text>
+    <text x="530" y="270" text-anchor="middle" class="t-small" style="fill:#938F99;"></text>
+
+    <!-- ═══ SERVICE 3: BROADCAST ═══ -->
+    <rect x="710" y="45" width="330" height="235" rx="10" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:1;"/>
+    <text x="875" y="65" text-anchor="middle" class="t-title" style="fill:#D0BCFF;">Broadcast Service</text>
+    <text x="875" y="80" text-anchor="middle" class="t-small" style="fill:#D0BCFF;">Protocol: REST API + FCM Pub/Sub</text>
+
+    <text x="730" y="100" class="t-body" style="fill:#D0BCFF;">Server: Fleet Server (REST API)</text>
+    <text x="730" y="118" class="t-body" style="fill:#D0BCFF;">Client: SmartHome iOS/Android App</text>
+
+    <rect x="730" y="130" width="145" height="35" rx="6" style="fill:#27203A;stroke:#C5B0F5;stroke-width:0.8;"/>
+    <text x="803" y="147" text-anchor="middle" class="t-body" style="fill:#D0BCFF;">POST /broadcast</text>
+    <text x="803" y="160" text-anchor="middle" class="t-small">admin publishes msg</text>
+
+    <rect x="885" y="130" width="140" height="35" rx="6" style="fill:#27203A;stroke:#C5B0F5;stroke-width:0.8;"/>
+    <text x="955" y="147" text-anchor="middle" class="t-body" style="fill:#D0BCFF;">FCM Subscribe</text>
+    <text x="955" y="160" text-anchor="middle" class="t-small">app subscribes to topic</text>
+
+    <rect x="730" y="175" width="145" height="35" rx="6" style="fill:#27203A;stroke:#C5B0F5;stroke-width:0.8;"/>
+    <text x="803" y="192" text-anchor="middle" class="t-body" style="fill:#D0BCFF;">Push Notification</text>
+    <text x="803" y="205" text-anchor="middle" class="t-small">real-time to app</text>
+
+    <rect x="885" y="175" width="140" height="35" rx="6" style="fill:#27203A;stroke:#C5B0F5;stroke-width:0.8;"/>
+    <text x="955" y="192" text-anchor="middle" class="t-body" style="fill:#D0BCFF;">Delivery ACK</text>
+    <text x="955" y="205" text-anchor="middle" class="t-small">app confirms receipt</text>
+
+    <text x="875" y="235" text-anchor="middle" class="t-small">Like Azure Event Hub — event-driven pub/sub</text>
+    <text x="875" y="250" text-anchor="middle" class="t-small" style="fill:#D0BCFF;">Admin → REST API → Push → Mobile App</text>
+    <text x="875" y="270" text-anchor="middle" class="t-small" style="fill:#938F99;"></text>
+
+    <!-- ═══ SEPARATION LINE ═══ -->
+    <line x1="355" y1="45" x2="355" y2="280" style="stroke:#49454F;stroke-width:1;stroke-dasharray:4 3;"/>
+    <line x1="700" y1="45" x2="700" y2="280" style="stroke:#49454F;stroke-width:1;stroke-dasharray:4 3;"/>
+
+    <!-- ═══ BOTTOM: CLEAR MAPPING ═══ -->
+    <rect x="20" y="295" width="1020" height="120" rx="10" style="fill:#1D1B20;stroke:#49454F;stroke-width:1;"/>
+    <text x="530" y="315" text-anchor="middle" class="t-title">Each Service — Different Protocol, Different Client, Different Purpose</text>
+
+    <!-- Service 1 column -->
+    <rect x="40" y="330" width="310" height="70" rx="8" style="fill:#1D2133;stroke:#A8C7FA;stroke-width:0.8;"/>
+    <text x="195" y="348" text-anchor="middle" class="t-label" style="fill:#A8C7FA;">Fleet (MQTT)</text>
+    <text x="55" y="365" class="t-small">Protocol: MQTT :1883</text>
+    <text x="55" y="378" class="t-small">Client: ESP32 devices</text>
+    <text x="55" y="391" class="t-small">Purpose: Track, monitor, OTA update fleet</text>
+
+    <!-- Service 2 column -->
+    <rect x="370" y="330" width="310" height="70" rx="8" style="fill:#1E2B1E;stroke:#7DCFB6;stroke-width:0.8;"/>
+    <text x="525" y="348" text-anchor="middle" class="t-label" style="fill:#7DCFB6;">Home Control (API)</text>
+    <text x="385" y="365" class="t-small">Protocol: ESPHome Native API :6053</text>
+    <text x="385" y="378" class="t-small">Client: ESP32 devices</text>
+    <text x="385" y="391" class="t-small">Purpose: Sensors, switches, automations</text>
+
+    <!-- Service 3 column -->
+    <rect x="700" y="330" width="320" height="70" rx="8" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:0.8;"/>
+    <text x="860" y="348" text-anchor="middle" class="t-label" style="fill:#D0BCFF;">Broadcast (REST Pub/Sub)</text>
+    <text x="715" y="365" class="t-small">Protocol: REST API + FCM push</text>
+    <text x="715" y="378" class="t-small">Client: SmartHome iOS/Android app</text>
+    <text x="715" y="391" class="t-small">Purpose: Community notifications to patients</text>
+
+    <!-- Key insight -->
+    <rect x="20" y="425" width="1020" height="35" rx="8" style="fill:#31111D;stroke:#F2B8B5;stroke-width:1;"/>
+    <text x="530" y="440" text-anchor="middle" class="t-label" style="fill:#F2B8B5;">IMPORTANT: These 3 services DO NOT overlap</text>
+    <text x="530" y="455" text-anchor="middle" class="t-small" style="fill:#F2B8B5;">Broadcast ≠ MQTT. ESP32 ≠ mobile app. HA ≠ fleet management. Each has its own protocol, client, and data.</text>
+
+    <!-- Physical mapping -->
+    <text x="530" y="485" text-anchor="middle" class="t-label">Where Each Runs</text>
+
+    <rect x="40" y="498" width="200" height="55" rx="8" style="fill:#1D2133;stroke:#A8C7FA;stroke-width:1;"/>
+    <text x="140" y="516" text-anchor="middle" class="t-label" style="fill:#A8C7FA;">Fleet Server</text>
+    <text x="140" y="532" text-anchor="middle" class="t-small">Fleet API + Mosquitto</text>
+    <text x="140" y="545" text-anchor="middle" class="t-small">Broadcast REST API</text>
+
+    <rect x="280" y="498" width="200" height="55" rx="8" style="fill:#1E2B1E;stroke:#7DCFB6;stroke-width:1;"/>
+    <text x="380" y="516" text-anchor="middle" class="t-label" style="fill:#7DCFB6;">HA Server</text>
+    <text x="380" y="532" text-anchor="middle" class="t-small">Home Assistant VM</text>
+    <text x="380" y="545" text-anchor="middle" class="t-small">ESPHome add-on</text>
+
+    <rect x="520" y="498" width="200" height="55" rx="8" style="fill:#2B2518;stroke:#E2C87E;stroke-width:1;"/>
+    <text x="620" y="516" text-anchor="middle" class="t-label" style="fill:#E2C87E;">ESP32 Device</text>
+    <text x="620" y="532" text-anchor="middle" class="t-small">→ MQTT to Fleet Server (MQTT)</text>
+    <text x="620" y="545" text-anchor="middle" class="t-small">→ API to HA Server (control)</text>
+
+    <rect x="760" y="498" width="200" height="55" rx="8" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:1;"/>
+    <text x="860" y="516" text-anchor="middle" class="t-label" style="fill:#D0BCFF;">Mobile App</text>
+    <text x="860" y="532" text-anchor="middle" class="t-small">→ REST API to Fleet Server → FCM push</text>
+    <text x="860" y="545" text-anchor="middle" class="t-small">(FCM topic subscriber)</text>
+  </svg>
+  <div class="footer">Tetradapt — Three Separate Services: Fleet (MQTT) | Home Control (API) | Broadcast (REST Pub/Sub) — Page 1 of 3</div>
+</div>
+
+<!-- ═══════════════ PAGE 2: BROADCAST FLOW (REST PUB/SUB) ═══════════════ -->
+<div class="page">
+  <h1>Broadcast Service — REST Pub/Sub (Like Azure Event Hub)</h1>
+  <p class="subtitle">Separate from MQTT and HA — Admin publishes via REST API, SmartHome app subscribes via WebSocket</p>
+
+  <svg width="1040" height="560" viewBox="0 0 1060 570">
+    <!-- Architecture comparison -->
+    <rect x="20" y="5" width="500" height="80" rx="10" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:1.5;"/>
+    <text x="270" y="25" text-anchor="middle" class="t-title" style="fill:#D0BCFF;">Broadcast Architecture (Event-Driven Pub/Sub)</text>
+    <text x="270" y="45" text-anchor="middle" class="t-body">Uses Firebase Cloud Messaging (FCM) — single API for iOS + Android push</text>
+    <text x="270" y="60" text-anchor="middle" class="t-small">Publisher: Admin via REST API → FCM | Subscribers: iOS/Android apps via FCM topics</text>
+    <text x="270" y="75" text-anchor="middle" class="t-small" style="fill:#D0BCFF;">Protocol: REST API + FCM — NOT MQTT</text>
+
+    <rect x="540" y="5" width="500" height="80" rx="10" style="fill:#1D1B20;stroke:#49454F;stroke-width:1;"/>
+    <text x="790" y="25" text-anchor="middle" class="t-label">REST API Endpoints</text>
+    <text x="555" y="42" class="t-mono" style="font-size:8px; fill:#D0BCFF;">POST /api/broadcast/          → publish to community</text>
+    <text x="555" y="55" class="t-mono" style="font-size:8px;">GET  /api/broadcast/          → list all broadcasts</text>
+    <text x="555" y="68" class="t-mono" style="font-size:8px;">GET  /api/broadcast/{id}      → detail + delivery stats</text>
+    <text x="555" y="81" class="t-mono" style="font-size:8px; fill:#7DCFB6;">FCM  topic subscribe (on app install)</text>
+
+    <!-- Flow diagram -->
+    <text x="530" y="110" text-anchor="middle" class="t-title">Broadcast Message Flow — Step by Step</text>
+
+    <!-- Step 1 -->
+    <rect x="20" y="125" width="160" height="50" rx="8" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:1.5;"/>
+    <text x="100" y="145" text-anchor="middle" class="t-label" style="fill:#D0BCFF;">1. Admin</text>
+    <text x="100" y="162" text-anchor="middle" class="t-small">Dashboard or curl</text>
+
+    <line x1="180" y1="150" x2="215" y2="150" style="stroke:#D0BCFF;stroke-width:1.5;" marker-end="url(#ap)"/>
+
+    <!-- Step 2 -->
+    <rect x="220" y="125" width="200" height="50" rx="8" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:1.5;"/>
+    <text x="320" y="143" text-anchor="middle" class="t-label" style="fill:#D0BCFF;">2. POST /api/broadcast</text>
+    <text x="320" y="160" text-anchor="middle" class="t-mono" style="font-size:8px;">{"community_ids":["nrh"],</text>
+    <text x="320" y="170" text-anchor="middle" class="t-mono" style="font-size:8px;"> "message":"Flu clinic Sat"}</text>
+
+    <line x1="420" y1="150" x2="455" y2="150" style="stroke:#D0BCFF;stroke-width:1.5;" marker-end="url(#ap)"/>
+
+    <!-- Step 3 -->
+    <rect x="460" y="125" width="180" height="50" rx="8" style="fill:#1D2133;stroke:#A8C7FA;stroke-width:1.5;"/>
+    <text x="550" y="145" text-anchor="middle" class="t-label" style="fill:#A8C7FA;">3. Fleet API</text>
+    <text x="550" y="162" text-anchor="middle" class="t-small">Save to PostgreSQL</text>
+
+    <line x1="640" y1="150" x2="675" y2="150" style="stroke:#A8C7FA;stroke-width:1.5;" marker-end="url(#ab)"/>
+
+    <!-- Step 4 -->
+    <rect x="680" y="125" width="200" height="50" rx="8" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:2;"/>
+    <text x="780" y="143" text-anchor="middle" class="t-label" style="fill:#D0BCFF;">4. FCM Push</text>
+    <text x="780" y="162" text-anchor="middle" class="t-small">Fan-out to all connected</text>
+    <text x="780" y="172" text-anchor="middle" class="t-small" style="fill:#D0BCFF;">NRH community subscribers</text>
+
+    <line x1="880" y1="150" x2="920" y2="150" style="stroke:#D0BCFF;stroke-width:1.5;" marker-end="url(#ap)"/>
+
+    <!-- Step 5: Mobile apps -->
+    <rect x="925" y="120" width="115" height="60" rx="8" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:2;"/>
+    <text x="983" y="142" text-anchor="middle" class="t-label" style="fill:#D0BCFF;">5. Mobile</text>
+    <text x="983" y="155" text-anchor="middle" class="t-label" style="fill:#D0BCFF;">Apps</text>
+    <text x="983" y="172" text-anchor="middle" class="t-small">Push notification</text>
+
+    <!-- ACK return -->
+    <line x1="983" y1="180" x2="983" y2="210" style="stroke:#F2B8B5;stroke-width:1.5;stroke-dasharray:5 3;" marker-end="url(#ar)"/>
+
+    <rect x="850" y="215" width="190" height="35" rx="8" style="fill:#31111D;stroke:#F2B8B5;stroke-width:1;"/>
+    <text x="945" y="233" text-anchor="middle" class="t-body" style="fill:#F2B8B5;">6. ACK → REST POST</text>
+    <text x="945" y="246" text-anchor="middle" class="t-small" style="fill:#F2B8B5;">POST /api/broadcast/{id}/ack</text>
+
+    <line x1="850" y1="232" x2="640" y2="232" style="stroke:#F2B8B5;stroke-width:1.5;stroke-dasharray:5 3;" marker-end="url(#ar)"/>
+
+    <rect x="460" y="215" width="180" height="35" rx="8" style="fill:#1D2133;stroke:#A8C7FA;stroke-width:1;"/>
+    <text x="550" y="233" text-anchor="middle" class="t-body" style="fill:#A8C7FA;">7. Track delivery in DB</text>
+    <text x="550" y="246" text-anchor="middle" class="t-small">Dashboard shows stats</text>
+
+    <!-- How mobile app subscribes -->
+    <rect x="20" y="270" width="1020" height="130" rx="10" style="fill:#1D1B20;stroke:#49454F;stroke-width:1;"/>
+    <text x="530" y="290" text-anchor="middle" class="t-title">How SmartHome App Subscribes (Pub/Sub Pattern)</text>
+
+    <!-- Subscribe flow -->
+    <rect x="40" y="305" width="170" height="42" rx="8" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:1;"/>
+    <text x="125" y="323" text-anchor="middle" class="t-body" style="fill:#D0BCFF;">App Opens</text>
+    <text x="125" y="338" text-anchor="middle" class="t-small">Patient logs in</text>
+
+    <line x1="210" y1="326" x2="240" y2="326" style="stroke:#D0BCFF;stroke-width:1.5;" marker-end="url(#ap)"/>
+
+    <rect x="245" y="305" width="200" height="42" rx="8" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:1;"/>
+    <text x="345" y="323" text-anchor="middle" class="t-body" style="fill:#D0BCFF;">FCM Topic Subscribe</text>
+    <text x="345" y="338" text-anchor="middle" class="t-mono" style="font-size:8px;">FCM topic subscriptionhome-001</text>
+
+    <line x1="445" y1="326" x2="475" y2="326" style="stroke:#D0BCFF;stroke-width:1.5;" marker-end="url(#ap)"/>
+
+    <rect x="480" y="305" width="200" height="42" rx="8" style="fill:#1D2133;stroke:#A8C7FA;stroke-width:1;"/>
+    <text x="580" y="323" text-anchor="middle" class="t-body" style="fill:#A8C7FA;">FCM Registers Device</text>
+    <text x="580" y="338" text-anchor="middle" class="t-small">App subscribes to community FCM topics</text>
+
+    <line x1="680" y1="326" x2="710" y2="326" style="stroke:#A8C7FA;stroke-width:1.5;" marker-end="url(#ab)"/>
+
+    <rect x="715" y="305" width="185" height="42" rx="8" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:1;"/>
+    <text x="808" y="323" text-anchor="middle" class="t-body" style="fill:#D0BCFF;">FCM Subscribed</text>
+    <text x="808" y="338" text-anchor="middle" class="t-small">FCM delivers to iOS + Android</text>
+
+    <text x="530" y="375" text-anchor="middle" class="t-small">App subscribes to FCM topics on login. When admin sends broadcast, FCM pushes to all subscribed iOS + Android devices instantly.</text>
+    <text x="530" y="390" text-anchor="middle" class="t-small" style="fill:#D0BCFF;">If app is offline: FCM queues and delivers when device reconnects (built-in offline support).</text>
+
+    <!-- Comparison table -->
+    <text x="530" y="425" text-anchor="middle" class="t-title">Broadcast vs Fleet MQTT — Completely Separate</text>
+    <rect x="20" y="435" width="1020" height="120" rx="10" style="fill:#1D1B20;stroke:#49454F;stroke-width:1;"/>
+
+    <text x="270" y="455" text-anchor="middle" class="t-label" style="fill:#A8C7FA;">Fleet MQTT (Service 1)</text>
+    <text x="790" y="455" text-anchor="middle" class="t-label" style="fill:#D0BCFF;">Broadcast REST (Service 3)</text>
+    <line x1="530" y1="440" x2="530" y2="550" style="stroke:#49454F;stroke-width:1;stroke-dasharray:4 3;"/>
+
+    <text x="40" y="475" class="t-small">Protocol: MQTT :1883</text>
+    <text x="40" y="490" class="t-small">Client: ESP32 hardware devices</text>
+    <text x="40" y="505" class="t-small">Data: heartbeat, register, OTA commands</text>
+    <text x="40" y="520" class="t-small">Direction: ESP32 → Server (mostly)</text>
+    <text x="40" y="535" class="t-small">Frequency: every 30 seconds</text>
+    <text x="40" y="550" class="t-small">Purpose: device health + firmware management</text>
+
+    <text x="550" y="475" class="t-small">Protocol: REST API + FCM</text>
+    <text x="550" y="490" class="t-small">Client: SmartHome iOS/Android app</text>
+    <text x="550" y="505" class="t-small">Data: community notifications (text messages)</text>
+    <text x="550" y="520" class="t-small">Direction: Server → App (push)</text>
+    <text x="550" y="535" class="t-small">Frequency: on-demand (admin sends)</text>
+    <text x="550" y="550" class="t-small">Purpose: patient communication by community group</text>
+  </svg>
+  <div class="footer">Tetradapt — Broadcast Service: REST Pub/Sub (NOT MQTT) — Like Azure Event Hub — Page 2 of 3</div>
+</div>
+
+<!-- ═══════════════ PAGE 3: LOCAL SETUP ═══════════════ -->
+<div class="page">
+  <h1>Local Setup — Mac + HA Server + ESP32 + Mobile App</h1>
+  <p class="subtitle">Three independent services, each with its own protocol and client</p>
+
+  <svg width="1040" height="400" viewBox="0 0 1060 410">
+    <!-- Mac -->
+    <rect x="20" y="10" width="370" height="280" rx="12" style="fill:#1D1B20;stroke:#49454F;stroke-width:1.5;"/>
+    <text x="205" y="32" text-anchor="middle" class="t-title">Fleet Server</text>
+
+    <rect x="40" y="45" width="330" height="100" rx="8" style="fill:#1D2133;stroke:#A8C7FA;stroke-width:1;"/>
+    <text x="205" y="63" text-anchor="middle" class="t-label" style="fill:#A8C7FA;">Service 1: Fleet Management</text>
+    <text x="55" y="80" class="t-small">Mosquitto MQTT :1883</text>
+    <text x="55" y="93" class="t-small">Fleet API :8000 (FastAPI)</text>
+    <text x="55" y="106" class="t-small">PostgreSQL :5433</text>
+    <text x="55" y="119" class="t-small">Grafana :3000 | Loki :3100</text>
+    <text x="55" y="135" class="t-small" style="fill:#A8C7FA;">← ESP32 connects here (MQTT)</text>
+
+    <rect x="40" y="155" width="330" height="80" rx="8" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:1;"/>
+    <text x="205" y="173" text-anchor="middle" class="t-label" style="fill:#D0BCFF;">Service 3: Broadcast (REST Pub/Sub)</text>
+    <text x="55" y="190" class="t-small">REST: POST /api/broadcast/</text>
+    <text x="55" y="203" class="t-small">WebSocket: FCM topic: {community_id}</text>
+    <text x="55" y="216" class="t-small">Delivery tracking + scheduled broadcasts</text>
+    <text x="55" y="229" class="t-small" style="fill:#D0BCFF;">← Mobile App connects here (REST + FCM)</text>
+
+    <text x="205" y="265" text-anchor="middle" class="t-small" style="fill:#938F99;">Production: DigitalOcean $24/mo</text>
+    <text x="205" y="280" text-anchor="middle" class="t-small" style="fill:#938F99;">+ Cloudflare DNS/SSL/CDN</text>
+
+    <!-- Dell -->
+    <rect x="430" y="10" width="280" height="130" rx="12" style="fill:#1E2B1E;stroke:#7DCFB6;stroke-width:1.5;"/>
+    <text x="570" y="32" text-anchor="middle" class="t-title" style="fill:#7DCFB6;">HA Server</text>
+    <text x="570" y="48" text-anchor="middle" class="t-small" style="fill:#7DCFB6;">Service 2: Home Control</text>
+
+    <rect x="450" y="58" width="240" height="25" rx="6" style="fill:#152620;stroke:#5DB391;stroke-width:0.8;"/>
+    <text x="570" y="75" text-anchor="middle" class="t-small">Home Assistant :8123</text>
+    <rect x="450" y="90" width="115" height="25" rx="6" style="fill:#152620;stroke:#5DB391;stroke-width:0.8;"/>
+    <text x="508" y="107" text-anchor="middle" class="t-small">ESPHome add-on</text>
+    <rect x="575" y="90" width="115" height="25" rx="6" style="fill:#152620;stroke:#5DB391;stroke-width:0.8;"/>
+    <text x="633" y="107" text-anchor="middle" class="t-small">Automations</text>
+    <text x="570" y="135" text-anchor="middle" class="t-small" style="fill:#7DCFB6;">← ESP32 connects here (Native API)</text>
+
+    <!-- ESP32 -->
+    <rect x="430" y="175" width="280" height="115" rx="12" style="fill:#2B2518;stroke:#E2C87E;stroke-width:2;"/>
+    <text x="570" y="197" text-anchor="middle" class="t-title" style="fill:#E2C87E;">ESP32 Device</text>
+    <text x="570" y="212" text-anchor="middle" class="t-small" style="fill:#E2C87E;">ESPHome firmware on Bahubali WiFi</text>
+
+    <text x="450" y="235" class="t-small" style="fill:#A8C7FA;">→ MQTT to Fleet Server :1883 (fleet heartbeat/register/OTA)</text>
+    <text x="450" y="250" class="t-small" style="fill:#7DCFB6;">→ API to HA Server :6053 (HA sensors/switches/control)</text>
+    <text x="450" y="270" class="t-small" style="fill:#938F99;">Broadcasts go to mobile app separately</text>
+
+    <!-- Mobile App -->
+    <rect x="750" y="10" width="280" height="280" rx="12" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:2;"/>
+    <text x="890" y="32" text-anchor="middle" class="t-title" style="fill:#D0BCFF;">SmartHome Mobile App</text>
+    <text x="890" y="48" text-anchor="middle" class="t-small" style="fill:#D0BCFF;">iOS / Android — Broadcast Subscriber</text>
+
+    <rect x="770" y="60" width="240" height="28" rx="6" style="fill:#27203A;stroke:#C5B0F5;stroke-width:0.8;"/>
+    <text x="890" y="78" text-anchor="middle" class="t-small">WebSocket → Fleet Server :8000/ws/broadcast/</text>
+
+    <rect x="770" y="96" width="240" height="28" rx="6" style="fill:#27203A;stroke:#C5B0F5;stroke-width:0.8;"/>
+    <text x="890" y="114" text-anchor="middle" class="t-small">Receives push notifications</text>
+
+    <rect x="770" y="132" width="240" height="28" rx="6" style="fill:#27203A;stroke:#C5B0F5;stroke-width:0.8;"/>
+    <text x="890" y="150" text-anchor="middle" class="t-small">Community: NRH, Kaiser, etc.</text>
+
+    <rect x="770" y="168" width="240" height="28" rx="6" style="fill:#27203A;stroke:#C5B0F5;stroke-width:0.8;"/>
+    <text x="890" y="186" text-anchor="middle" class="t-small">Notification feed + inbox</text>
+
+    <rect x="770" y="204" width="240" height="28" rx="6" style="fill:#31111D;stroke:#F2B8B5;stroke-width:0.8;"/>
+    <text x="890" y="222" text-anchor="middle" class="t-small" style="fill:#F2B8B5;">ACK: POST /api/broadcast/{id}/ack</text>
+
+    <text x="890" y="255" text-anchor="middle" class="t-small" style="fill:#D0BCFF;">Connects ONLY to Fleet Server (REST + FCM)</text>
+    <text x="890" y="270" text-anchor="middle" class="t-small" style="fill:#938F99;">Independent from device layer</text>
+    <text x="890" y="285" text-anchor="middle" class="t-small" style="fill:#938F99;">Uses REST API + FCM only</text>
+
+    <!-- Connection arrows -->
+    <line x1="390" y1="95" x2="430" y2="80" style="stroke:#A8C7FA;stroke-width:2;" marker-end="url(#ab)"/>
+    <text x="405" y="78" class="t-small" style="fill:#A8C7FA;">MQTT</text>
+
+    <line x1="390" y1="185" x2="430" y2="200" style="stroke:#D0BCFF;stroke-width:2;" marker-end="url(#ap)"/>
+    <text x="400" y="205" class="t-small" style="fill:#D0BCFF;">REST + FCM</text>
+
+    <line x1="570" y1="140" x2="570" y2="175" style="stroke:#7DCFB6;stroke-width:2;" marker-end="url(#ag)"/>
+    <text x="590" y="162" class="t-small" style="fill:#7DCFB6;">API :6053</text>
+
+    <line x1="500" y1="245" x2="405" y2="120" style="stroke:#A8C7FA;stroke-width:1.5;stroke-dasharray:5 3;" marker-end="url(#ab)"/>
+  </svg>
+
+  <!-- Summary table -->
+  <h2 style="background:#1D1B20;color:#CAC4D0;">Protocol Separation — No Overlap</h2>
+  <table>
+    <tr>
+      <th style="width:15%;">Service</th>
+      <th style="width:15%;">Protocol</th>
+      <th style="width:15%;">Server</th>
+      <th style="width:15%;">Client</th>
+      <th style="width:20%;">Data</th>
+      <th style="width:20%;">Purpose</th>
+    </tr>
+    <tr>
+      <td style="color:#A8C7FA;font-weight:500;">Fleet Mgmt</td>
+      <td>MQTT :1883</td>
+      <td>Fleet Server (Mosquitto)</td>
+      <td>ESP32 devices</td>
+      <td>Heartbeat, register, OTA</td>
+      <td>Track + update device fleet</td>
+    </tr>
+    <tr>
+      <td style="color:#7DCFB6;font-weight:500;">Home Control</td>
+      <td>ESPHome API :6053</td>
+      <td>HA Server</td>
+      <td>ESP32 devices</td>
+      <td>Sensors, switches, automations</td>
+      <td>Local smart home control</td>
+    </tr>
+    <tr>
+      <td style="color:#D0BCFF;font-weight:500;">Broadcast</td>
+      <td>REST API + FCM</td>
+      <td>Fleet Server</td>
+      <td>SmartHome mobile app</td>
+      <td>Community notifications</td>
+      <td>Patient communication</td>
+    </tr>
+  </table>
+
+  <div class="footer">Tetradapt — Local Setup: Fleet (MQTT) | Home Control (API) | Broadcast (REST Pub/Sub) — Page 3 of 3</div>
+</div>
+
+</body>
+</html>

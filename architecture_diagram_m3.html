@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ESP32 Fleet Management — Architecture Diagrams</title>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* ── Material Design 3 — Dark Theme Tokens ──────────────────────── */
+  /* Surface hierarchy: lowest → highest elevation                     */
+  /* #121212 (bg) → #1D1B20 (surface) → #25232A (container)           */
+  /* → #2B2930 (container-high) → #36343B (container-highest)         */
+  /* On-Surface: #E6E0E9  On-Surface-Variant: #CAC4D0                 */
+  /* Primary: #D0BCFF  Secondary: #CCC2DC  Tertiary: #EFB8C8          */
+  /* Outline: #938F99  Outline-Variant: #49454F                        */
+
+  @page { size: 297mm 210mm; margin: 10mm 10mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Google Sans', 'Roboto', 'Segoe UI', system-ui, sans-serif;
+    background: #121212;
+    color: #E6E0E9;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    width: 277mm; height: 190mm; max-height: 190mm; overflow: hidden;
+    margin: 0 auto; padding: 8px 10px;
+    page-break-after: always; page-break-inside: avoid;
+    background: #121212;
+  }
+  .page:last-child { page-break-after: auto; }
+  h1 {
+    text-align: center; font-size: 16px; font-weight: 500;
+    color: #E6E0E9; margin-bottom: 2px; letter-spacing: 0.15px;
+  }
+  .subtitle {
+    text-align: center; color: #CAC4D0; font-size: 10px;
+    margin-bottom: 2px; font-weight: 400; letter-spacing: 0.25px;
+  }
+  h2 {
+    text-align: center; font-size: 14px; margin: 2px 0 4px;
+    color: #A8C7FA; font-weight: 500; letter-spacing: 0.1px;
+  }
+  svg { display: block; margin: 0 auto; }
+
+  /* ── SVG Text Classes (M3 type scale) ──────────────────────────── */
+  .label { font-family: 'Google Sans', 'Roboto', system-ui, sans-serif; fill: #E6E0E9; font-size: 12px; font-weight: 500; }
+  .label-sm { font-family: 'Roboto', system-ui, sans-serif; fill: #CAC4D0; font-size: 10.5px; font-weight: 400; }
+  .label-xs { font-family: 'Roboto', system-ui, sans-serif; fill: #938F99; font-size: 9.5px; font-weight: 400; }
+  .label-price { font-family: 'Google Sans', system-ui, sans-serif; fill: #7DCFB6; font-size: 9.5px; font-weight: 500; }
+  .label-title { font-family: 'Google Sans', system-ui, sans-serif; fill: #A8C7FA; font-size: 13px; font-weight: 500; }
+  .label-section { font-family: 'Roboto', system-ui, sans-serif; fill: #938F99; font-size: 10px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; }
+  .label-free { font-family: 'Google Sans', system-ui, sans-serif; fill: #7DCFB6; font-size: 8.5px; font-weight: 500; }
+  .label-cf { font-family: 'Google Sans', system-ui, sans-serif; fill: #F6821F; font-size: 9px; font-weight: 500; }
+
+  /* ── UI Components (M3 surface + outline) ──────────────────────── */
+  .legend {
+    display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;
+    margin: 2px 0; padding: 5px 12px;
+    background: #1D1B20; border-radius: 12px; border: 1px solid #49454F;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 9px; color: #CAC4D0; font-weight: 400; }
+  .legend-color { width: 10px; height: 10px; border-radius: 4px; border: 1.5px solid; flex-shrink: 0; }
+  .cost-row { text-align: center; margin: 3px 0 0; }
+  .cost-badge {
+    display: inline-block; padding: 3px 12px; border-radius: 16px;
+    font-size: 10px; font-weight: 500; margin: 0 4px;
+    letter-spacing: 0.1px;
+  }
+  .footer {
+    text-align: center; font-size: 8px; color: #49454F;
+    margin-top: 3px; border-top: 1px solid #2B2930; padding-top: 3px;
+    letter-spacing: 0.4px;
+  }
+</style>
+</head>
+<body>
+
+<!-- PAGE 1: INFRASTRUCTURE -->
+<div class="page">
+  <h1>ESP32 Fleet Management — Tetradapt</h1>
+  <p class="subtitle">Cloudflare + DigitalOcean — Single Droplet, All Open Source</p>
+  <h2>1. Infrastructure Diagram — $24/mo</h2>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-color" style="background:#2D2240;border-color:#C5B0F5;"></div> Internet</div>
+    <div class="legend-item"><div class="legend-color" style="background:#332211;border-color:#F6821F;"></div> Cloudflare (Free)</div>
+    <div class="legend-item"><div class="legend-color" style="background:#31111D;border-color:#F2B8B5;"></div> DO Firewall (Free)</div>
+    <div class="legend-item"><div class="legend-color" style="background:#25232A;border-color:#7CACF8;"></div> Droplet ($24)</div>
+    <div class="legend-item"><div class="legend-color" style="background:#1A2E25;border-color:#5DB391;"></div> Docker (Free)</div>
+    <div class="legend-item"><div class="legend-color" style="background:#1E2B1E;border-color:#7DCFB6;"></div> Patient Home</div>
+  </div>
+  <svg width="1040" height="520" viewBox="0 0 1100 560">
+    <defs>
+      <marker id="ah" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#49454F"/></marker>
+      <marker id="ab" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#7CACF8"/></marker>
+      <marker id="ag1" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#7DCFB6"/></marker>
+      <marker id="acf" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#F6821F"/></marker>
+    </defs>
+    <!-- INTERNET -->
+    <rect x="370" y="5" width="360" height="32" style="fill:#2D2240;stroke:#C5B0F5;stroke-width:1.5;rx:8;"/>
+    <text x="550" y="22" text-anchor="middle" class="label">INTERNET — Admins | Qualys | ESP32 OTA downloads</text>
+    <line x1="550" y1="37" x2="550" y2="52" marker-end="url(#ah)" style="stroke:#49454F;stroke-width:1.5;fill:none;"/>
+
+    <!-- CLOUDFLARE -->
+    <rect x="220" y="52" width="660" height="68" style="fill:#332211;stroke:#F6821F;stroke-width:2;rx:12;"/>
+    <text x="550" y="72" text-anchor="middle" class="label" fill="#F6821F">CLOUDFLARE (Existing Account — FREE)</text>
+    <text x="550" y="87" text-anchor="middle" class="label-xs">DNS: fleet.tetradapt.com | SSL: Full (Strict) | CDN: Cache /firmware/* + /dashboard/* | DDoS + WAF</text>
+    <text x="550" y="102" text-anchor="middle" class="label-xs">Orange Cloud Proxy | Rate Limit: /api/broadcast 10 req/min | Bypass Cache: /api/* | Edge TTL: firmware 1h, dashboard 24h</text>
+    <text x="870" y="72" text-anchor="end" class="label-free">FREE</text>
+
+    <!-- Arrows from CF -->
+    <line x1="420" y1="120" x2="420" y2="145" marker-end="url(#acf)" style="stroke:#F6821F;stroke-width:1.5;fill:none;"/>
+    <text x="435" y="140" class="label-xs" fill="#F6821F">HTTPS :443</text>
+    <line x1="700" y1="120" x2="700" y2="145" marker-end="url(#ah)" style="stroke:#49454F;stroke-width:1.5;fill:none;"/>
+    <text x="715" y="140" class="label-xs">MQTTS :8883 (bypasses CF)</text>
+
+    <!-- DO Firewall -->
+    <rect x="820" y="52" width="180" height="68" style="fill:#31111D;stroke:#F2B8B5;stroke-width:1;rx:8;"/>
+    <text x="910" y="72" text-anchor="middle" class="label-sm">DO Firewall</text>
+    <text x="910" y="87" text-anchor="middle" class="label-xs">443: CF IPs only</text>
+    <text x="910" y="100" text-anchor="middle" class="label-xs">8883: Home IPs</text>
+    <text x="910" y="113" text-anchor="middle" class="label-xs">51820: VPN</text>
+    <text x="990" y="72" text-anchor="end" class="label-free">FREE</text>
+
+    <!-- VPC -->
+    <rect x="30" y="145" width="1040" height="290" style="fill:#1D1B20;stroke:#4A4458;stroke-width:1.5;stroke-dasharray:6 3;rx:12;"/>
+    <text x="550" y="162" text-anchor="middle" class="label-section">DO VPC — 10.0.0.0/16 — SFO3 (FREE)</text>
+
+    <!-- SINGLE DROPLET -->
+    <rect x="50" y="172" width="1000" height="250" style="fill:#25232A;stroke:#7CACF8;stroke-width:2;rx:12;"/>
+    <text x="550" y="192" text-anchor="middle" class="label-title">SINGLE DROPLET — 2 vCPU / 4GB RAM / 80GB SSD — 4TB transfer</text>
+    <text x="1030" y="192" text-anchor="end" class="label-price">$24/mo</text>
+
+    <!-- Docker Compose -->
+    <rect x="70" y="202" width="960" height="208" style="fill:#2B2930;stroke:#49454F;stroke-width:1;rx:8;stroke-dasharray:4 2;"/>
+    <text x="550" y="217" text-anchor="middle" class="label-section">DOCKER COMPOSE</text>
+
+    <!-- Row 1: App -->
+    <rect x="85" y="226" width="140" height="42" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="155" y="244" text-anchor="middle" class="label-sm">Nginx</text>
+    <text x="155" y="258" text-anchor="middle" class="label-xs">:80 → CF handles SSL</text>
+    <rect x="240" y="226" width="190" height="42" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="335" y="244" text-anchor="middle" class="label-sm">FastAPI + Fleet API</text>
+    <text x="335" y="258" text-anchor="middle" class="label-xs">Fleet API + OTA + FCM Broadcast</text>
+    <rect x="445" y="226" width="140" height="42" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="515" y="244" text-anchor="middle" class="label-sm">React Dashboard</text>
+    <text x="515" y="258" text-anchor="middle" class="label-xs">Static → Nginx → CF CDN</text>
+    <rect x="600" y="226" width="100" height="42" style="fill:#1E2B1E;stroke:#7DCFB6;stroke-width:1;rx:8;"/>
+    <text x="650" y="244" text-anchor="middle" class="label-sm" fill="#7DCFB6">Broadcast</text>
+    <text x="650" y="258" text-anchor="middle" class="label-xs">FCM Push</text>
+
+    <!-- Row 2: Data -->
+    <rect x="85" y="280" width="140" height="42" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="155" y="298" text-anchor="middle" class="label-sm">PostgreSQL 16</text>
+    <text x="155" y="312" text-anchor="middle" class="label-xs">Vol: /pgdata</text>
+    <rect x="240" y="280" width="140" height="42" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="310" y="298" text-anchor="middle" class="label-sm">Mosquitto MQTT</text>
+    <text x="310" y="312" text-anchor="middle" class="label-xs">:8883 TLS + ACL</text>
+    <rect x="395" y="280" width="140" height="42" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="465" y="298" text-anchor="middle" class="label-sm">WireGuard VPN</text>
+    <text x="465" y="312" text-anchor="middle" class="label-xs">:51820 UDP tunnels</text>
+
+    <!-- Row 3: Monitoring -->
+    <rect x="85" y="334" width="140" height="42" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="155" y="352" text-anchor="middle" class="label-sm">Grafana OSS</text>
+    <text x="155" y="366" text-anchor="middle" class="label-xs">Dashboard :3000</text>
+    <rect x="240" y="334" width="140" height="42" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="310" y="352" text-anchor="middle" class="label-sm">Loki</text>
+    <text x="310" y="366" text-anchor="middle" class="label-xs">Log aggregation</text>
+    <rect x="395" y="334" width="140" height="42" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="465" y="352" text-anchor="middle" class="label-sm">Rsyslog</text>
+    <text x="465" y="366" text-anchor="middle" class="label-xs">UDP 514</text>
+
+    <!-- Local Storage -->
+    <rect x="560" y="280" width="455" height="96" style="fill:#1D1B20;stroke:#49454F;stroke-width:0.8;rx:8;"/>
+    <text x="788" y="298" text-anchor="middle" class="label-sm">Local Storage (80GB SSD)</text>
+    <text x="575" y="316" class="label-xs">/data/firmware/*.bin — served by Nginx, cached by Cloudflare CDN globally</text>
+    <text x="575" y="332" class="label-xs">Broadcast uses FCM push (no files stored) — firmware only</text>
+    <text x="575" y="348" class="label-xs">/data/backups/*.sql.gz — daily pg_dump, 7-day retention</text>
+    <text x="575" y="364" class="label-xs">/pgdata/ — PostgreSQL data volume</text>
+
+    <!-- Backup + Registry -->
+    <rect x="85" y="388" width="450" height="18" style="fill:#1D1B20;stroke:#49454F;stroke-width:0.5;rx:6;"/>
+    <text x="310" y="401" text-anchor="middle" class="label-xs">Backup: pg_dump daily → /data/backups/ (7-day retention) | DO Snapshots for DR ($0.06/GB)</text>
+    <rect x="560" y="388" width="455" height="18" style="fill:#1D1B20;stroke:#49454F;stroke-width:0.5;rx:6;"/>
+    <text x="788" y="401" text-anchor="middle" class="label-xs">DO Container Registry (Free: 1 repo, 500MB) | DO Monitoring (Free: CPU/RAM/Disk alerts)</text>
+
+    <!-- VPN arrow -->
+    <line x1="465" y1="322" x2="465" y2="450" style="stroke:#7DCFB6;stroke-width:1.5;stroke-dasharray:5 3;fill:none;"/>
+    <text x="480" y="448" class="label-xs" fill="#7DCFB6">WireGuard VPN (bypasses CF)</text>
+
+    <!-- HOMES -->
+    <rect x="80" y="460" width="280" height="80" style="fill:#1E2B1E;stroke:#7DCFB6;stroke-width:1.5;rx:8;"/>
+    <text x="220" y="480" text-anchor="middle" class="label">Home A</text>
+    <text x="220" y="492" text-anchor="middle" class="label-xs" fill="#7DCFB6">Community: NRH</text>
+    <text x="100" y="508" class="label-xs">Home Assistant + ESP32s + Sensors</text>
+    <text x="100" y="522" class="label-xs">WireGuard + MQTT | Fall sensor, Mobile App, Display</text>
+    <rect x="410" y="460" width="280" height="80" style="fill:#1E2B1E;stroke:#7DCFB6;stroke-width:1.5;rx:8;"/>
+    <text x="550" y="480" text-anchor="middle" class="label">Home B</text>
+    <text x="550" y="492" text-anchor="middle" class="label-xs" fill="#7DCFB6">Community: Kaiser</text>
+    <text x="430" y="508" class="label-xs">Home Assistant + ESP32s + Sensors</text>
+    <text x="430" y="522" class="label-xs">WireGuard + MQTT | Motion, Door, Mobile App</text>
+    <rect x="740" y="460" width="280" height="80" style="fill:#1E2B1E;stroke:#7DCFB6;stroke-width:1.5;rx:8;"/>
+    <text x="880" y="480" text-anchor="middle" class="label">Home N</text>
+    <text x="880" y="492" text-anchor="middle" class="label-xs" fill="#7DCFB6">Community: NRH + Sutter Health</text>
+    <text x="760" y="508" class="label-xs">Home Assistant + ESP32s + Sensors</text>
+    <text x="760" y="522" class="label-xs">WireGuard + MQTT | Sensors, Mobile App, Display</text>
+
+    <line x1="340" y1="450" x2="220" y2="460" style="stroke:#7DCFB6;stroke-width:1.5;stroke-dasharray:5 3;fill:none;" marker-end="url(#ag1)"/>
+    <line x1="465" y1="450" x2="550" y2="460" style="stroke:#7DCFB6;stroke-width:1.5;stroke-dasharray:5 3;fill:none;" marker-end="url(#ag1)"/>
+    <line x1="580" y1="450" x2="880" y2="460" style="stroke:#7DCFB6;stroke-width:1.5;stroke-dasharray:5 3;fill:none;" marker-end="url(#ag1)"/>
+  </svg>
+  <div class="cost-row">
+    <span class="cost-badge" style="background:#1A2E25;color:#7DCFB6;">Total: $24/mo (just the Droplet)</span>
+    <span class="cost-badge" style="background:#332211;color:#F6821F;">Cloudflare: DNS + SSL + CDN + DDoS = FREE</span>
+    <span class="cost-badge" style="background:#25232A;color:#CAC4D0;">Was $175/mo — saved 86%</span>
+  </div>
+  <div class="footer">Tetradapt — ESP32 Fleet Management — Cloudflare + DigitalOcean Infrastructure — Page 1 of 3</div>
+</div>
+
+<!-- PAGE 2: APPLICATION COMPONENTS -->
+<div class="page">
+  <h1>ESP32 Fleet Management — Tetradapt</h1>
+  <p class="subtitle">Application Components — Docker Compose on Single Droplet behind Cloudflare</p>
+  <h2>2. Application Server Components</h2>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-color" style="background:#332211;border-color:#F6821F;"></div> Cloudflare Edge</div>
+    <div class="legend-item"><div class="legend-color" style="background:#2B2518;border-color:#E2C87E;"></div> Nginx</div>
+    <div class="legend-item"><div class="legend-color" style="background:#25232A;border-color:#7CACF8;"></div> FastAPI</div>
+    <div class="legend-item"><div class="legend-color" style="background:#1A2E25;border-color:#5DB391;"></div> MQTT</div>
+    <div class="legend-item"><div class="legend-color" style="background:#2D2240;border-color:#D0BCFF;"></div> Fleet API</div>
+    <div class="legend-item"><div class="legend-color" style="background:#31111D;border-color:#F2B8B5;"></div> Auth</div>
+    <div class="legend-item"><div class="legend-color" style="background:#1D2B3A;border-color:#7DD0E2;"></div> Background Svc</div>
+    <div class="legend-item"><div class="legend-color" style="background:#1D2B35;border-color:#7DD0E2;"></div> Dashboard</div>
+  </div>
+  <svg width="1040" height="530" viewBox="0 0 1100 570">
+    <!-- CF EDGE -->
+    <rect x="15" y="5" width="1070" height="30" style="fill:#332211;stroke:#F6821F;stroke-width:1.5;rx:8;"/>
+    <text x="550" y="24" text-anchor="middle" class="label" fill="#F6821F">CLOUDFLARE EDGE — SSL Termination | CDN Cache (/firmware/*, /dashboard/*) | DDoS | WAF | Rate Limiting</text>
+
+    <!-- APP SERVER -->
+    <rect x="15" y="45" width="1070" height="460" style="fill:#1D1B20;stroke:#4A4458;stroke-width:1.5;rx:12;stroke-dasharray:6 3;"/>
+    <text x="550" y="62" text-anchor="middle" class="label-title">SINGLE DROPLET — Docker Compose (2 vCPU / 4GB RAM) — $24/mo</text>
+
+    <!-- NGINX -->
+    <rect x="180" y="72" width="740" height="30" style="fill:#2B2718;stroke:#E2C87E;stroke-width:1.5;rx:8;"/>
+    <text x="550" y="92" text-anchor="middle" class="label-sm">NGINX :80 (SSL terminated at Cloudflare) — Reverse Proxy | Static Files | Firmware Serving | WebSocket</text>
+    <text x="290" y="115" text-anchor="middle" class="label-xs" fill="#E2C87E">/api/*</text>
+    <text x="440" y="115" text-anchor="middle" class="label-xs" fill="#E2C87E">/dashboard/*</text>
+    <text x="590" y="115" text-anchor="middle" class="label-xs" fill="#E2C87E">/firmware/*</text>
+    <text x="740" y="115" text-anchor="middle" class="label-xs" fill="#E2C87E">/ws/*</text>
+    <line x1="290" y1="102" x2="290" y2="120" style="stroke:#E2C87E;stroke-width:1;"/>
+    <line x1="440" y1="102" x2="440" y2="120" style="stroke:#E2C87E;stroke-width:1;"/>
+    <line x1="590" y1="102" x2="590" y2="120" style="stroke:#E2C87E;stroke-width:1;"/>
+    <line x1="740" y1="102" x2="740" y2="120" style="stroke:#E2C87E;stroke-width:1;"/>
+
+    <!-- AUTH -->
+    <rect x="70" y="120" width="960" height="25" style="fill:#31111D;stroke:#F2B8B5;stroke-width:1;rx:8;"/>
+    <text x="550" y="137" text-anchor="middle" class="label-sm">AUTH MIDDLEWARE (OAuth2/JWT) — admin: full access | operator: OTA + broadcast | viewer: read-only</text>
+
+    <!-- FASTAPI -->
+    <rect x="35" y="155" width="560" height="195" style="fill:#25232A;stroke:#7CACF8;stroke-width:1.5;rx:8;"/>
+    <text x="315" y="173" text-anchor="middle" class="label-title">FastAPI + Fleet API :8000</text>
+    <text x="315" y="185" text-anchor="middle" class="label-xs">(No Celery/Redis — in-process scheduler)</text>
+
+    <rect x="50" y="194" width="255" height="142" style="fill:#24283D;stroke:#7CACF8;stroke-width:1;rx:8;"/>
+    <text x="178" y="210" text-anchor="middle" class="label-sm">REST API Routes</text>
+    <line x1="58" y1="216" x2="297" y2="216" style="stroke:#49454F;stroke-width:0.5;"/>
+    <text x="58" y="230" class="label-xs">POST /api/broadcast      → Community msg</text>
+    <text x="58" y="244" class="label-xs">GET  /api/broadcast/:id  → Delivery status</text>
+    <text x="58" y="258" class="label-xs">CRUD /api/communities | /homes</text>
+    <text x="58" y="272" class="label-xs">CRUD /api/devices | /firmware</text>
+    <text x="58" y="286" class="label-xs">POST /api/ota (rollouts)</text>
+    <text x="58" y="300" class="label-xs">GET  /api/logs | /audit | /health</text>
+    <text x="58" y="320" class="label-xs">/ws/fleet-status | /ws/ota-progress</text>
+
+    <rect x="320" y="194" width="255" height="68" style="fill:#24283D;stroke:#7CACF8;stroke-width:1;rx:8;"/>
+    <text x="448" y="210" text-anchor="middle" class="label-sm">Internal Services</text>
+    <line x1="328" y1="216" x2="567" y2="216" style="stroke:#49454F;stroke-width:0.5;"/>
+    <text x="328" y="230" class="label-xs">CommunityResolver  group → home list</text>
+    <text x="328" y="244" class="label-xs">FirmwareValidator  checksum + signing</text>
+    <text x="328" y="258" class="label-xs">AuditLogger | RateLimiter</text>
+
+    <rect x="320" y="272" width="255" height="64" style="fill:#24283D;stroke:#7CACF8;stroke-width:1;rx:8;"/>
+    <text x="448" y="288" text-anchor="middle" class="label-sm">Firmware Serving</text>
+    <line x1="328" y1="294" x2="567" y2="294" style="stroke:#49454F;stroke-width:0.5;"/>
+    <text x="328" y="308" class="label-xs">/data/firmware/*.bin → Nginx → CF CDN</text>
+    <text x="328" y="322" class="label-xs">ESP32 downloads from CF edge (global)</text>
+
+    <!-- REACT DASHBOARD -->
+    <rect x="620" y="155" width="440" height="195" style="fill:#1D2B35;stroke:#7DD0E2;stroke-width:1.5;rx:8;"/>
+    <text x="840" y="173" text-anchor="middle" class="label-title">React Dashboard (Nginx → CF CDN cached)</text>
+    <rect x="640" y="185" width="110" height="25" style="fill:#24283D;stroke:#7CACF8;stroke-width:1;rx:4;"/>
+    <text x="695" y="201" text-anchor="middle" class="label-xs">Fleet Overview</text>
+    <rect x="760" y="185" width="110" height="25" style="fill:#24283D;stroke:#7CACF8;stroke-width:1;rx:4;"/>
+    <text x="815" y="201" text-anchor="middle" class="label-xs">Device Detail</text>
+    <rect x="880" y="185" width="160" height="25" style="fill:#24283D;stroke:#7CACF8;stroke-width:1;rx:4;"/>
+    <text x="960" y="201" text-anchor="middle" class="label-xs">Log Viewer</text>
+    <rect x="640" y="218" width="110" height="25" style="fill:#24283D;stroke:#7CACF8;stroke-width:1;rx:4;"/>
+    <text x="695" y="234" text-anchor="middle" class="label-xs">OTA Manager</text>
+    <rect x="760" y="218" width="110" height="25" style="fill:#24283D;stroke:#7CACF8;stroke-width:1;rx:4;"/>
+    <text x="815" y="234" text-anchor="middle" class="label-xs">Communities</text>
+    <rect x="880" y="218" width="160" height="25" style="fill:#24283D;stroke:#7CACF8;stroke-width:1;rx:4;"/>
+    <text x="960" y="234" text-anchor="middle" class="label-xs">Security / Audit</text>
+    <rect x="640" y="252" width="400" height="38" style="fill:#1A2E1A;stroke:#7DCFB6;stroke-width:1.5;rx:8;"/>
+    <text x="840" y="268" text-anchor="middle" class="label" fill="#7DCFB6">Broadcast Center</text>
+    <text x="840" y="282" text-anchor="middle" class="label-xs">Compose | Schedule | Community Select | Delivery Report</text>
+    <rect x="640" y="300" width="400" height="32" style="fill:#24283D;stroke:#7CACF8;stroke-width:1;rx:4;"/>
+    <text x="840" y="320" text-anchor="middle" class="label-xs">Real-time via WebSocket: fleet status, OTA progress</text>
+
+    <!-- MQTT -->
+    <rect x="35" y="370" width="280" height="95" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1.5;rx:8;"/>
+    <text x="175" y="388" text-anchor="middle" class="label">MQTT Client (aiomqtt)</text>
+    <rect x="50" y="397" width="120" height="28" style="fill:#152620;stroke:#4DA882;stroke-width:0.8;rx:6;"/>
+    <text x="110" y="410" text-anchor="middle" class="label-xs" fill="#5DB391">Subscribes</text>
+    <text x="58" y="422" class="label-xs">register, heartbeat, ack</text>
+    <rect x="185" y="397" width="115" height="28" style="fill:#152620;stroke:#4DA882;stroke-width:0.8;rx:6;"/>
+    <text x="243" y="410" text-anchor="middle" class="label-xs" fill="#5DB391">Publishes</text>
+    <text x="193" y="422" class="label-xs">(fleet topics only)</text>
+    <text x="175" y="456" text-anchor="middle" class="label-xs">→ Mosquitto Docker (:8883 TLS)</text>
+
+    <!-- APSCHEDULER -->
+    <rect x="340" y="370" width="300" height="95" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:1.5;rx:8;"/>
+    <text x="490" y="388" text-anchor="middle" class="label">Fleet API Tasks (in-process)</text>
+    <rect x="355" y="400" width="125" height="28" style="fill:#27203A;stroke:#C5B0F5;stroke-width:0.8;rx:6;"/>
+    <text x="418" y="418" text-anchor="middle" class="label-xs">ota_rollout()</text>
+    <rect x="490" y="400" width="135" height="28" style="fill:#27203A;stroke:#C5B0F5;stroke-width:0.8;rx:6;"/>
+    <text x="558" y="418" text-anchor="middle" class="label-xs">send_broadcast()</text>
+    <text x="490" y="456" text-anchor="middle" class="label-xs">upload_firmware() | scheduled_broadcast() via FCM</text>
+
+    <!-- BACKGROUND -->
+    <rect x="665" y="370" width="395" height="95" style="fill:#1D2B3A;stroke:#7DD0E2;stroke-width:1.5;rx:8;"/>
+    <text x="863" y="388" text-anchor="middle" class="label">Background Services</text>
+    <rect x="680" y="400" width="115" height="28" style="fill:#1D2B35;stroke:#7DD0E2;stroke-width:0.8;rx:6;"/>
+    <text x="738" y="418" text-anchor="middle" class="label-xs">Heartbeat Mon.</text>
+    <rect x="805" y="400" width="115" height="28" style="fill:#1D2B35;stroke:#7DD0E2;stroke-width:0.8;rx:6;"/>
+    <text x="863" y="418" text-anchor="middle" class="label-xs">Device Registrar</text>
+    <rect x="930" y="400" width="115" height="28" style="fill:#1D2B35;stroke:#7DD0E2;stroke-width:0.8;rx:6;"/>
+    <text x="988" y="418" text-anchor="middle" class="label-xs">Alert Service</text>
+    <text x="863" y="456" text-anchor="middle" class="label-xs">Scheduled FCM push | Dead device alerts → Email / Slack</text>
+
+    <!-- Docker services footer -->
+    <text x="550" y="488" text-anchor="middle" class="label-section">ALL DOCKER CONTAINERS ON SAME DROPLET</text>
+    <rect x="35" y="496" width="135" height="28" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="103" y="514" text-anchor="middle" class="label-xs">PostgreSQL 16</text>
+    <rect x="182" y="496" width="120" height="28" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="242" y="514" text-anchor="middle" class="label-xs">Mosquitto</text>
+    <rect x="314" y="496" width="120" height="28" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="374" y="514" text-anchor="middle" class="label-xs">WireGuard</text>
+    <rect x="446" y="496" width="120" height="28" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="506" y="514" text-anchor="middle" class="label-xs">Grafana</text>
+    <rect x="578" y="496" width="100" height="28" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="628" y="514" text-anchor="middle" class="label-xs">Loki</text>
+    <rect x="690" y="496" width="100" height="28" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="740" y="514" text-anchor="middle" class="label-xs">Rsyslog</text>
+
+    <rect x="810" y="496" width="245" height="28" style="fill:#1E2B1E;stroke:#7DCFB6;stroke-width:1;rx:8;"/>
+    <text x="933" y="510" text-anchor="middle" class="label-sm">Patient Homes via WireGuard VPN</text>
+    <text x="933" y="521" text-anchor="middle" class="label-xs">NRH | Kaiser | St Jude | Sutter Health</text>
+
+    <!-- All FREE labels -->
+    <text x="550" y="545" text-anchor="middle" class="label-xs">All services: FREE (open source, self-hosted) — Only cost: $24/mo Droplet</text>
+  </svg>
+  <div class="footer">Tetradapt — ESP32 Fleet Management — Application Components — Page 2 of 3</div>
+</div>
+
+<!-- PAGE 3: DATA FLOW -->
+<div class="page">
+  <h1>ESP32 Fleet Management — Tetradapt</h1>
+  <p class="subtitle">Data Flow — All traffic encrypted, Cloudflare edge caching, no PHI on server</p>
+  <h2>3. Data Flow Paths</h2>
+  <svg width="1040" height="540" viewBox="0 0 1100 580">
+    <defs>
+      <marker id="fg" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#7DCFB6"/></marker>
+      <marker id="fb" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#A8C7FA"/></marker>
+      <marker id="fy" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#E2C87E"/></marker>
+      <marker id="fp" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#D0BCFF"/></marker>
+      <marker id="ft" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#5DB391"/></marker>
+      <marker id="fv" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#C5B0F5"/></marker>
+      <marker id="fo" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#F6821F"/></marker>
+    </defs>
+
+    <!-- FLOW 1: BROADCAST -->
+    <rect x="20" y="5" width="1060" height="95" style="fill:#1A241A;stroke:#7DCFB6;stroke-width:1;rx:12;"/>
+    <text x="40" y="22" class="label" fill="#7DCFB6" font-size="13">1. BROADCAST (FCM PUSH TO MOBILE APPS)</text>
+    <rect x="40" y="34" width="78" height="26" style="fill:#1E2B1E;stroke:#7DCFB6;stroke-width:1;rx:8;"/>
+    <text x="79" y="51" text-anchor="middle" class="label-xs">Admin</text>
+    <line x1="118" y1="47" x2="138" y2="47" style="stroke:#7DCFB6;stroke-width:1.5;" marker-end="url(#fg)"/>
+    <rect x="143" y="34" width="95" height="26" style="fill:#1E2B1E;stroke:#7DCFB6;stroke-width:1;rx:8;"/>
+    <text x="191" y="51" text-anchor="middle" class="label-xs">Dashboard</text>
+    <line x1="238" y1="47" x2="258" y2="47" style="stroke:#7DCFB6;stroke-width:1.5;" marker-end="url(#fg)"/>
+    <rect x="263" y="34" width="105" height="26" style="fill:#332211;stroke:#F6821F;stroke-width:1;rx:8;"/>
+    <text x="316" y="51" text-anchor="middle" class="label-xs" fill="#F6821F">Cloudflare</text>
+    <line x1="368" y1="47" x2="388" y2="47" style="stroke:#7DCFB6;stroke-width:1.5;" marker-end="url(#fg)"/>
+    <rect x="393" y="34" width="105" height="26" style="fill:#1E2B1E;stroke:#7DCFB6;stroke-width:1;rx:8;"/>
+    <text x="446" y="46" text-anchor="middle" class="label-xs">POST /api/</text>
+    <text x="446" y="56" text-anchor="middle" class="label-xs">broadcast</text>
+    <line x1="498" y1="47" x2="518" y2="47" style="stroke:#7DCFB6;stroke-width:1.5;" marker-end="url(#fg)"/>
+    <rect x="523" y="34" width="105" height="26" style="fill:#1E2B1E;stroke:#7DCFB6;stroke-width:1;rx:8;"/>
+    <text x="576" y="51" text-anchor="middle" class="label-xs">Fleet API</text>
+    <line x1="628" y1="47" x2="648" y2="47" style="stroke:#7DCFB6;stroke-width:1.5;" marker-end="url(#fg)"/>
+    <rect x="653" y="34" width="115" height="26" style="fill:#1E2B1E;stroke:#7DCFB6;stroke-width:1;rx:8;"/>
+    <text x="711" y="46" text-anchor="middle" class="label-xs">FCM Push</text>
+    <text x="711" y="56" text-anchor="middle" class="label-xs">to subscribers</text>
+    <line x1="768" y1="47" x2="788" y2="47" style="stroke:#7DCFB6;stroke-width:1.5;" marker-end="url(#fg)"/>
+    <rect x="793" y="34" width="115" height="26" style="fill:#1E2B1E;stroke:#7DCFB6;stroke-width:1;rx:8;"/>
+    <text x="851" y="46" text-anchor="middle" class="label-xs">Home HA</text>
+    <text x="851" y="56" text-anchor="middle" class="label-xs">SmartHome App + Display</text>
+    <line x1="908" y1="47" x2="928" y2="47" style="stroke:#7DCFB6;stroke-width:1.5;" marker-end="url(#fg)"/>
+    <rect x="933" y="34" width="100" height="26" style="fill:#1E2B1E;stroke:#7DCFB6;stroke-width:1;rx:8;"/>
+    <text x="983" y="51" text-anchor="middle" class="label-xs">Patient hears</text>
+    <rect x="523" y="68" width="510" height="22" style="fill:#152620;stroke:#4DA882;stroke-width:0.8;rx:4;"/>
+    <text x="778" y="83" text-anchor="middle" class="label-xs" fill="#7DCFB6">ACK → MQTT → Fleet API → PostgreSQL (delivery tracking) → Dashboard delivery report</text>
+
+    <!-- FLOW 2: OTA -->
+    <rect x="20" y="110" width="1060" height="95" style="fill:#1D2133;stroke:#7CACF8;stroke-width:1;rx:12;"/>
+    <text x="40" y="127" class="label" fill="#A8C7FA" font-size="13">2. OTA FIRMWARE UPDATE (Cloudflare CDN cached)</text>
+    <rect x="40" y="139" width="78" height="26" style="fill:#25232A;stroke:#7CACF8;stroke-width:1;rx:8;"/>
+    <text x="79" y="156" text-anchor="middle" class="label-xs">Admin</text>
+    <line x1="118" y1="152" x2="138" y2="152" style="stroke:#60a5fa;stroke-width:1.5;" marker-end="url(#fb)"/>
+    <rect x="143" y="139" width="105" height="26" style="fill:#25232A;stroke:#7CACF8;stroke-width:1;rx:8;"/>
+    <text x="196" y="151" text-anchor="middle" class="label-xs">Upload .bin</text>
+    <text x="196" y="161" text-anchor="middle" class="label-xs">/api/firmware</text>
+    <line x1="248" y1="152" x2="268" y2="152" style="stroke:#60a5fa;stroke-width:1.5;" marker-end="url(#fb)"/>
+    <rect x="273" y="139" width="105" height="26" style="fill:#25232A;stroke:#7CACF8;stroke-width:1;rx:8;"/>
+    <text x="326" y="156" text-anchor="middle" class="label-xs">Save → /data/</text>
+    <line x1="378" y1="152" x2="398" y2="152" style="stroke:#60a5fa;stroke-width:1.5;" marker-end="url(#fb)"/>
+    <rect x="403" y="139" width="105" height="26" style="fill:#25232A;stroke:#7CACF8;stroke-width:1;rx:8;"/>
+    <text x="456" y="151" text-anchor="middle" class="label-xs">Fleet API</text>
+    <text x="456" y="161" text-anchor="middle" class="label-xs">canary → staged</text>
+    <line x1="508" y1="152" x2="528" y2="152" style="stroke:#60a5fa;stroke-width:1.5;" marker-end="url(#fb)"/>
+    <rect x="533" y="139" width="115" height="26" style="fill:#25232A;stroke:#7CACF8;stroke-width:1;rx:8;"/>
+    <text x="591" y="156" text-anchor="middle" class="label-xs">MQTT OTA cmd</text>
+    <line x1="648" y1="152" x2="668" y2="152" style="stroke:#60a5fa;stroke-width:1.5;" marker-end="url(#fb)"/>
+    <rect x="673" y="139" width="130" height="26" style="fill:#332211;stroke:#F6821F;stroke-width:1;rx:8;"/>
+    <text x="738" y="151" text-anchor="middle" class="label-xs" fill="#F6821F">ESP32 pulls .bin</text>
+    <text x="738" y="161" text-anchor="middle" class="label-xs" fill="#F6821F">via CF CDN edge</text>
+    <line x1="803" y1="152" x2="823" y2="152" style="stroke:#60a5fa;stroke-width:1.5;" marker-end="url(#fb)"/>
+    <rect x="828" y="139" width="100" height="26" style="fill:#25232A;stroke:#7CACF8;stroke-width:1;rx:8;"/>
+    <text x="878" y="156" text-anchor="middle" class="label-xs">Flash + Reboot</text>
+    <rect x="673" y="175" width="255" height="20" style="fill:#1D2133;stroke:#7CACF8;stroke-width:0.8;rx:4;"/>
+    <text x="801" y="189" text-anchor="middle" class="label-xs" fill="#A8C7FA">ACK → MQTT → PostgreSQL → rollback if failed</text>
+
+    <!-- FLOW 3: HEARTBEAT -->
+    <rect x="20" y="215" width="1060" height="65" style="fill:#2B2518;stroke:#E2C87E;stroke-width:1;rx:12;"/>
+    <text x="40" y="232" class="label" fill="#E2C87E" font-size="13">3. HEARTBEAT (every 30s via WireGuard — bypasses Cloudflare)</text>
+    <rect x="40" y="248" width="120" height="24" style="fill:#2B2718;stroke:#E2C87E;stroke-width:1;rx:8;"/>
+    <text x="100" y="264" text-anchor="middle" class="label-xs">ESP32 Device</text>
+    <line x1="160" y1="260" x2="195" y2="260" style="stroke:#E2C87E;stroke-width:1.5;" marker-end="url(#fy)"/>
+    <rect x="200" y="248" width="145" height="24" style="fill:#2B2718;stroke:#E2C87E;stroke-width:1;rx:8;"/>
+    <text x="273" y="264" text-anchor="middle" class="label-xs">MQTT heartbeat (VPN)</text>
+    <line x1="345" y1="260" x2="380" y2="260" style="stroke:#E2C87E;stroke-width:1.5;" marker-end="url(#fy)"/>
+    <rect x="385" y="248" width="130" height="24" style="fill:#2B2718;stroke:#E2C87E;stroke-width:1;rx:8;"/>
+    <text x="450" y="264" text-anchor="middle" class="label-xs">Fleet API → store</text>
+    <line x1="515" y1="260" x2="550" y2="260" style="stroke:#E2C87E;stroke-width:1.5;" marker-end="url(#fy)"/>
+    <rect x="555" y="248" width="130" height="24" style="fill:#2B2718;stroke:#E2C87E;stroke-width:1;rx:8;"/>
+    <text x="620" y="264" text-anchor="middle" class="label-xs">PostgreSQL (Docker)</text>
+    <line x1="685" y1="260" x2="720" y2="260" style="stroke:#E2C87E;stroke-width:1.5;" marker-end="url(#fy)"/>
+    <rect x="725" y="248" width="185" height="24" style="fill:#31111D;stroke:#F2B8B5;stroke-width:1;rx:8;"/>
+    <text x="818" y="264" text-anchor="middle" class="label-xs" fill="#F2B8B5">If dead >90s → Email / Slack / HA alert</text>
+
+    <!-- FLOW 4: REGISTRATION -->
+    <rect x="20" y="290" width="1060" height="60" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:1;rx:12;"/>
+    <text x="40" y="307" class="label" fill="#D0BCFF" font-size="13">4. DEVICE REGISTRATION (on boot via WireGuard)</text>
+    <rect x="40" y="320" width="110" height="22" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:1;rx:8;"/>
+    <text x="95" y="335" text-anchor="middle" class="label-xs">ESP32 boots</text>
+    <line x1="150" y1="331" x2="182" y2="331" style="stroke:#D0BCFF;stroke-width:1.5;" marker-end="url(#fp)"/>
+    <rect x="187" y="320" width="155" height="22" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:1;rx:8;"/>
+    <text x="265" y="335" text-anchor="middle" class="label-xs">MQTT register (MAC, ver)</text>
+    <line x1="342" y1="331" x2="374" y2="331" style="stroke:#D0BCFF;stroke-width:1.5;" marker-end="url(#fp)"/>
+    <rect x="379" y="320" width="130" height="22" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:1;rx:8;"/>
+    <text x="444" y="335" text-anchor="middle" class="label-xs">Device Registrar</text>
+    <line x1="509" y1="331" x2="541" y2="331" style="stroke:#D0BCFF;stroke-width:1.5;" marker-end="url(#fp)"/>
+    <rect x="546" y="320" width="155" height="22" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:1;rx:8;"/>
+    <text x="624" y="335" text-anchor="middle" class="label-xs">Auto-create in PostgreSQL</text>
+    <line x1="701" y1="331" x2="733" y2="331" style="stroke:#D0BCFF;stroke-width:1.5;" marker-end="url(#fp)"/>
+    <rect x="738" y="320" width="170" height="22" style="fill:#2D2240;stroke:#D0BCFF;stroke-width:1;rx:8;"/>
+    <text x="823" y="335" text-anchor="middle" class="label-xs">Assign to Home + Community</text>
+
+    <!-- FLOW 5: LOGGING -->
+    <rect x="20" y="360" width="1060" height="60" style="fill:#1A2B28;stroke:#5DB391;stroke-width:1;rx:12;"/>
+    <text x="40" y="377" class="label" fill="#5DB391" font-size="13">5. CENTRAL LOGGING</text>
+    <rect x="40" y="390" width="110" height="22" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="95" y="405" text-anchor="middle" class="label-xs">ESP32 syslog</text>
+    <line x1="150" y1="401" x2="182" y2="401" style="stroke:#34d399;stroke-width:1.5;" marker-end="url(#ft)"/>
+    <rect x="187" y="390" width="145" height="22" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="260" y="405" text-anchor="middle" class="label-xs">UDP → Rsyslog (Docker)</text>
+    <line x1="332" y1="401" x2="364" y2="401" style="stroke:#34d399;stroke-width:1.5;" marker-end="url(#ft)"/>
+    <rect x="369" y="390" width="130" height="22" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="434" y="405" text-anchor="middle" class="label-xs">Loki (index + search)</text>
+    <line x1="499" y1="401" x2="531" y2="401" style="stroke:#34d399;stroke-width:1.5;" marker-end="url(#ft)"/>
+    <rect x="536" y="390" width="155" height="22" style="fill:#1A2E25;stroke:#5DB391;stroke-width:1;rx:8;"/>
+    <text x="614" y="405" text-anchor="middle" class="label-xs">Grafana Dashboard (:3000)</text>
+
+    <!-- FLOW 6: DASHBOARD -->
+    <rect x="20" y="430" width="1060" height="60" style="fill:#2D2240;stroke:#C5B0F5;stroke-width:1;rx:12;"/>
+    <text x="40" y="447" class="label" fill="#C5B0F5" font-size="13">6. DASHBOARD (real-time via Cloudflare)</text>
+    <rect x="40" y="460" width="80" height="22" style="fill:#2D2240;stroke:#C5B0F5;stroke-width:1;rx:8;"/>
+    <text x="80" y="475" text-anchor="middle" class="label-xs">Browser</text>
+    <line x1="120" y1="471" x2="143" y2="471" style="stroke:#a78bfa;stroke-width:1.5;" marker-end="url(#fv)"/>
+    <rect x="148" y="460" width="120" height="22" style="fill:#332211;stroke:#F6821F;stroke-width:1;rx:8;"/>
+    <text x="208" y="475" text-anchor="middle" class="label-xs" fill="#F6821F">CF Edge (SSL+CDN)</text>
+    <line x1="268" y1="471" x2="291" y2="471" style="stroke:#a78bfa;stroke-width:1.5;" marker-end="url(#fv)"/>
+    <rect x="296" y="460" width="85" height="22" style="fill:#2D2240;stroke:#C5B0F5;stroke-width:1;rx:8;"/>
+    <text x="339" y="475" text-anchor="middle" class="label-xs">Nginx :80</text>
+    <line x1="381" y1="471" x2="404" y2="471" style="stroke:#a78bfa;stroke-width:1.5;" marker-end="url(#fv)"/>
+    <rect x="409" y="460" width="120" height="22" style="fill:#2D2240;stroke:#C5B0F5;stroke-width:1;rx:8;"/>
+    <text x="469" y="471" text-anchor="middle" class="label-xs">React (CF cached)</text>
+    <text x="469" y="480" text-anchor="middle" class="label-xs">+ WSS upgrade</text>
+    <line x1="529" y1="471" x2="552" y2="471" style="stroke:#a78bfa;stroke-width:1.5;" marker-end="url(#fv)"/>
+    <rect x="557" y="460" width="270" height="22" style="fill:#2D2240;stroke:#C5B0F5;stroke-width:1;rx:8;"/>
+    <text x="692" y="475" text-anchor="middle" class="label-xs">FastAPI WebSocket → fleet status | OTA progress</text>
+
+    <!-- ENCRYPTION SUMMARY -->
+    <rect x="20" y="505" width="1060" height="60" style="fill:#25232A;stroke:#49454F;stroke-width:1;rx:8;"/>
+    <text x="550" y="522" text-anchor="middle" class="label" font-size="12">Traffic Encryption Summary</text>
+    <text x="550" y="538" text-anchor="middle" class="label-xs">HTTPS: Browser → Cloudflare (SSL) → Origin Nginx (:80) | MQTTS: ESP32/HA → WireGuard VPN → Mosquitto :8883 TLS</text>
+    <text x="550" y="552" text-anchor="middle" class="label-xs">WireGuard: UDP 51820 (Patient Homes ↔ Droplet, bypasses Cloudflare) | No PHI on fleet server or ESP32 — stays local in HA (HIPAA)</text>
+  </svg>
+  <div class="footer">Tetradapt — ESP32 Fleet Management — Data Flow Paths — Page 3 of 3</div>
+</div>
+
+</body>
+</html>

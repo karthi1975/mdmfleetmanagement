@@ -1,0 +1,90 @@
+# Shared config included by all ESP32 devices via packages.
+# Provides: MQTT heartbeat (30s), registration on boot, OTA, logger.
+# Device-specific YAML sets substitutions: device_name, device_role, firmware_version.
+# Uses ESPHome native API — compatible with both ESP-IDF and Arduino frameworks.
+
+substitutions:
+  firmware_version: "1.0.0"
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+
+esphome:
+  name: ${device_name}
+  includes: []
+  on_boot:
+    priority: -100
+    then:
+      - wait_until:
+          condition:
+            lambda: 'return id(mqtt_client).is_connected();'
+      - delay: 1s
+      - mqtt.publish:
+          topic: "fleet/${device_name}/register"
+          qos: 1
+          retain: true
+          payload: !lambda |-
+            return "{\"mac\":\"" + get_mac_address_pretty() +
+                   "\",\"version\":\"${firmware_version}\"" +
+                   ",\"role\":\"${device_role}\"}";
+
+mqtt:
+  id: mqtt_client
+  broker: !secret mqtt_broker
+  port: 1883
+  topic_prefix: "fleet/${device_name}"
+  birth_message:
+    topic: "fleet/${device_name}/status"
+    payload: "online"
+  will_message:
+    topic: "fleet/${device_name}/status"
+    payload: "offline"
+
+interval:
+  - interval: 30s
+    then:
+      - mqtt.publish:
+          topic: "fleet/${device_name}/heartbeat"
+          payload: !lambda |-
+            int rssi = 0;
+            if (!std::isnan(id(wifi_rssi).state)) {
+              rssi = (int)id(wifi_rssi).state;
+            }
+            char buf[128];
+            snprintf(buf, sizeof(buf),
+              "{\"uptime\":%u,\"heap\":%u,\"rssi\":%d}",
+              (unsigned)(millis() / 1000),
+              (unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT),
+              rssi);
+            return std::string(buf);
+
+sensor:
+  - platform: wifi_signal
+    id: wifi_rssi
+    name: "${device_name} WiFi Signal"
+    update_interval: 30s
+    internal: true
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# MQTT-triggered HTTP OTA — subscribes to fleet/{device}/ota/cmd
+mqtt_ota:
+
+logger:
+  level: INFO
+  logs:
+    mqtt: INFO
+    wifi: WARN
+  # Central logging (Req 3): ESPHome logs forwarded via MQTT topic
+  # Fleet server subscribes to fleet/{device}/log and pushes to Loki
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "${device_name}-fallback"
+    password: !secret ap_password

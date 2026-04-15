@@ -1,0 +1,9 @@
+Security essentials (non-negotiable before go-live)                                                                                     
+                                                                                                                                          
+  1. TLS everywhere — nginx with Let's Encrypt (Caddy or certbot). No plaintext HTTP for API or firmware downloads.                       
+  2. Per-device tokens — no shared OTA password across the fleet; one compromised device can't poison others.
+  3. Signed firmware — fleet server signs .bin with a private key; devices verify with a baked-in public key before flashing. Prevents a  
+  compromised nginx from pushing malicious firmware.                                                                                      
+  4. MQTT TLS + ACLs — port 8883, per-user topic isolation.                                                                               
+  5. Rate limiting on /api/v1/devices/register to prevent enumeration.                                                                    
+                                                                        

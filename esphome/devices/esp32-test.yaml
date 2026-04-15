@@ -1,0 +1,39 @@
+# First test device — flash via USB, connects to local Mosquitto.
+# After flashing: ESP32 → WiFi → MQTT register → heartbeat every 30s → Fleet API picks it up.
+
+substitutions:
+  device_name: "esp32-test"
+  device_role: "sensor"
+  firmware_version: "10.0.0"
+
+packages:
+  base: !include ../common/base.yaml
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+# Built-in LED as a visual heartbeat indicator
+output:
+  - platform: gpio
+    pin: GPIO2
+    id: led_output
+
+light:
+  - platform: binary
+    name: "${device_name} LED"
+    output: led_output
+    id: onboard_led
+
+# Blink LED every 2s — visible proof that OTA v2.0.0 landed
+interval:
+  - interval: 2s
+    then:
+      - light.toggle: onboard_led
+
+# Additional sensors (wifi_signal already in base.yaml)
+sensor:
+  - platform: uptime
+    name: "${device_name} Uptime"
+    update_interval: 30s

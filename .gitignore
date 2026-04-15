@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+*.egg
+
+# Virtual environment
+venv/
+.venv/
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude
+.claude/
+CLAUDE.md
+.claude.json
+
+# MCP / Playwright
+.playwright-mcp/
+
+# Docker runtime data
+pgdata/
+data/firmware/*.bin
+data/broadcast/*.mp3
+data/backups/*.sql.gz
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ESPHome
+esphome/.esphome/
+esphome/secrets.yaml
+
+# Coverage
+htmlcov/
+.coverage

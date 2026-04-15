@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ESP32 Fleet Management — Component Reference</title>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  @page { size: 297mm 210mm; margin: 12mm 14mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Roboto', 'Segoe UI', system-ui, sans-serif;
+    background: #121212; color: #E6E0E9;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    width: 273mm; height: 186mm; max-height: 186mm; overflow: hidden;
+    margin: 0 auto; padding: 12px 16px;
+    page-break-after: always; page-break-inside: avoid;
+    background: #121212;
+  }
+  .page:last-child { page-break-after: auto; }
+
+  /* Header */
+  .page-header {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #2B2930;
+  }
+  .page-title {
+    font-family: 'Google Sans', sans-serif; font-size: 16px; font-weight: 500;
+    color: #E6E0E9; letter-spacing: 0.15px;
+  }
+  .page-subtitle {
+    font-family: 'Roboto', sans-serif; font-size: 10px; color: #938F99;
+    letter-spacing: 0.4px;
+  }
+
+  /* Section headers */
+  .section {
+    display: flex; align-items: center; gap: 8px;
+    margin: 10px 0 5px; padding: 5px 10px;
+    border-radius: 8px;
+  }
+  .section-icon {
+    width: 8px; height: 8px; border-radius: 4px; flex-shrink: 0;
+  }
+  .section-title {
+    font-family: 'Google Sans', sans-serif; font-size: 12px; font-weight: 500;
+    letter-spacing: 0.1px;
+  }
+  .section-badge {
+    font-family: 'Roboto', sans-serif; font-size: 9px; font-weight: 500;
+    padding: 2px 8px; border-radius: 12px; letter-spacing: 0.5px;
+  }
+  .section:first-child { margin-top: 0; }
+
+  /* Table */
+  table {
+    width: 100%; border-collapse: separate; border-spacing: 0;
+    margin: 0; font-size: 9.5px;
+  }
+  th {
+    font-family: 'Roboto', sans-serif; font-weight: 500; font-size: 8.5px;
+    letter-spacing: 1px; text-transform: uppercase;
+    padding: 4px 8px; text-align: left;
+    color: #938F99; border-bottom: 1px solid #49454F;
+  }
+  td {
+    padding: 4px 8px; vertical-align: top;
+    border-bottom: 1px solid #2B2930;
+  }
+  tr:last-child td { border-bottom: none; }
+  .col-component { width: 22%; font-weight: 500; color: #E6E0E9; }
+  .col-port { width: 14%; font-family: 'Roboto Mono', monospace; font-size: 9px; color: #CAC4D0; }
+  .col-purpose { width: 64%; color: #CAC4D0; line-height: 1.4; }
+
+  /* Color-coded component names */
+  .c-cf { color: #F6821F; }
+  .c-do { color: #7CACF8; }
+  .c-app { color: #A8C7FA; }
+  .c-data { color: #7DD0E2; }
+  .c-mon { color: #D0BCFF; }
+  .c-store { color: #CAC4D0; }
+  .c-home { color: #7DCFB6; }
+  .c-esp { color: #E2C87E; }
+
+  /* Footer */
+  .footer {
+    text-align: center; font-size: 7.5px; color: #49454F;
+    margin-top: 6px; padding-top: 4px; border-top: 1px solid #2B2930;
+    letter-spacing: 0.4px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════ PAGE 1 -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-title">ESP32 Fleet Management — Component Reference</span>
+    <span class="page-subtitle">Tetradapt &nbsp;|&nbsp; Cloudflare + DigitalOcean &nbsp;|&nbsp; $24/mo</span>
+  </div>
+
+  <!-- CLOUDFLARE -->
+  <div class="section" style="background:#332211;">
+    <div class="section-icon" style="background:#F6821F;"></div>
+    <span class="section-title" style="color:#F6821F;">Cloudflare</span>
+    <span class="section-badge" style="background:#3D2A11;color:#F6821F;">EXTERNAL — FREE (EXISTING ACCOUNT)</span>
+  </div>
+  <table>
+    <tr><th>Component</th><th>Port / Protocol</th><th>Purpose</th></tr>
+    <tr><td class="col-component c-cf">Cloudflare DNS</td><td class="col-port">—</td><td class="col-purpose">Resolves <code>fleet.tetradapt.com</code> to Droplet IP. Orange cloud proxy enabled.</td></tr>
+    <tr><td class="col-component c-cf">Cloudflare SSL</td><td class="col-port">:443 HTTPS</td><td class="col-purpose">Terminates SSL at edge. Full (Strict) mode — encrypts edge-to-origin. Free universal cert.</td></tr>
+    <tr><td class="col-component c-cf">Cloudflare CDN</td><td class="col-port">—</td><td class="col-purpose">Caches <code>/firmware/*.bin</code> (1h edge TTL) and <code>/dashboard/*</code> (24h) at 300+ global PoPs. ESP32 pulls firmware from nearest edge.</td></tr>
+    <tr><td class="col-component c-cf">Cloudflare DDoS</td><td class="col-port">—</td><td class="col-purpose">Automatic DDoS mitigation on all proxied traffic. Always-on, no configuration needed.</td></tr>
+    <tr><td class="col-component c-cf">Cloudflare WAF</td><td class="col-port">—</td><td class="col-purpose">Web Application Firewall — blocks malicious requests, SQL injection, XSS before reaching origin.</td></tr>
+    <tr><td class="col-component c-cf">Cloudflare Rate Limiting</td><td class="col-port">—</td><td class="col-purpose">Throttles <code>/api/broadcast</code> to 10 req/min. Prevents broadcast flood abuse.</td></tr>
+  </table>
+
+  <!-- DIGITALOCEAN FREE -->
+  <div class="section" style="background:#1D2133;">
+    <div class="section-icon" style="background:#7CACF8;"></div>
+    <span class="section-title" style="color:#7CACF8;">DigitalOcean Free Services</span>
+    <span class="section-badge" style="background:#24283D;color:#7CACF8;">FREE TIER</span>
+  </div>
+  <table>
+    <tr><th>Component</th><th>Port / Protocol</th><th>Purpose</th></tr>
+    <tr><td class="col-component c-do">DO Cloud Firewall</td><td class="col-port">—</td><td class="col-purpose">Stateful firewall rules: port 443 (Cloudflare IPs only), 8883 (home VPN IPs), 51820 (WireGuard). Blocks all other inbound.</td></tr>
+    <tr><td class="col-component c-do">DO VPC</td><td class="col-port">10.0.0.0/16</td><td class="col-purpose">Private network in SFO3 region. Isolates Droplet from other tenants. Free internal traffic.</td></tr>
+    <tr><td class="col-component c-do">DO Monitoring</td><td class="col-port">—</td><td class="col-purpose">Built-in system metrics — CPU, RAM, disk, bandwidth. Email and Slack alerts on threshold breach.</td></tr>
+    <tr><td class="col-component c-do">DO Container Registry</td><td class="col-port">—</td><td class="col-purpose">Stores <code>fleet-server:latest</code> Docker image. Free tier: 1 repo, 500MB storage.</td></tr>
+  </table>
+
+  <!-- APPLICATION LAYER -->
+  <div class="section" style="background:#24283D;">
+    <div class="section-icon" style="background:#A8C7FA;"></div>
+    <span class="section-title" style="color:#A8C7FA;">Application Layer — Docker Compose on Droplet ($24/mo)</span>
+    <span class="section-badge" style="background:#2B3044;color:#A8C7FA;">2 vCPU / 4GB RAM / 80GB SSD</span>
+  </div>
+  <table>
+    <tr><th>Component</th><th>Port / Protocol</th><th>Purpose</th></tr>
+    <tr><td class="col-component c-app">Nginx</td><td class="col-port">:80 HTTP</td><td class="col-purpose">Reverse proxy — routes <code>/api/*</code> to FastAPI, serves <code>/dashboard/*</code> static files, serves <code>/firmware/*.bin</code> for CDN origin, upgrades <code>/ws/*</code> to WebSocket. SSL handled by Cloudflare.</td></tr>
+    <tr><td class="col-component c-app">FastAPI</td><td class="col-port">:8000</td><td class="col-purpose">Fleet management REST API — CRUD for devices, homes, communities, firmware. Triggers OTA rollouts, composes/sends broadcast messages, queries logs and audit trail. WebSocket for live fleet status + OTA progress. Broadcast uses FCM push to mobile apps.</td></tr>
+    <tr><td class="col-component c-app">APScheduler</td><td class="col-port">(in-process)</td><td class="col-purpose">In-process async task scheduler inside FastAPI. Replaces Celery + Redis. Runs: <code>ota_rollout()</code> canary/staged, <code>send_broadcast()</code> community fan-out, <code>upload_firmware()</code> validation, <code>scheduled_broadcast()</code> timed delivery to mobile app subscribers.</td></tr>
+    <tr><td class="col-component c-app">React Dashboard</td><td class="col-port">(static files)</td><td class="col-purpose">Web UI served by Nginx, cached by Cloudflare CDN. Pages: Fleet Overview, Device Detail, OTA Manager, Broadcast Center (compose/schedule/delivery report), Communities, Log Viewer, Security/Audit. Real-time updates via WebSocket.</td></tr>
+  </table>
+
+  <div class="footer">Tetradapt — ESP32 Fleet Management — Component Reference — Page 1 of 3</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ PAGE 2 -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-title">ESP32 Fleet Management — Component Reference</span>
+    <span class="page-subtitle">Data Layer &nbsp;|&nbsp; Monitoring &nbsp;|&nbsp; Storage</span>
+  </div>
+
+  <!-- DATA LAYER -->
+  <div class="section" style="background:#1D2B35;">
+    <div class="section-icon" style="background:#7DD0E2;"></div>
+    <span class="section-title" style="color:#7DD0E2;">Data Layer — Docker Compose (same Droplet)</span>
+    <span class="section-badge" style="background:#223240;color:#7DD0E2;">FREE — SELF-HOSTED</span>
+  </div>
+  <table>
+    <tr><th>Component</th><th>Port / Protocol</th><th>Purpose</th></tr>
+    <tr><td class="col-component c-data">PostgreSQL 16</td><td class="col-port">:5432 TCP</td><td class="col-purpose">Primary relational database. Tables: <code>devices</code>, <code>homes</code>, <code>communities</code>, <code>home_community</code> (many-to-many), <code>broadcasts</code>, <code>broadcast_acks</code>, <code>firmware_versions</code>, <code>ota_events</code>, <code>audit_log</code>, <code>users</code>. Docker volume: <code>/pgdata</code>.</td></tr>
+    <tr><td class="col-component c-data">Mosquitto MQTT</td><td class="col-port">:8883 TLS</td><td class="col-purpose">Message broker with TLS + ACL authentication. Topics: <code>fleet/{device}/heartbeat</code> (30s interval), <code>fleet/{device}/register</code> (on boot), <code>fleet/broadcast/community/{group_id}</code> (server → homes fan-out), <code>fleet/broadcast/home/{home_id}</code> (direct), <code>fleet/{home_id}/broadcast/ack</code> (delivery receipt), <code>fleet/{device}/ota/cmd</code> + <code>status</code>.</td></tr>
+    <tr><td class="col-component c-data">WireGuard VPN</td><td class="col-port">:51820 UDP</td><td class="col-purpose">VPN server — encrypted tunnel from each patient home to Droplet. Bypasses Cloudflare (direct IP). Carries MQTT traffic and syslog UDP. Each home gets a unique peer config with pre-shared key.</td></tr>
+  </table>
+
+  <!-- MONITORING LAYER -->
+  <div class="section" style="background:#2D2240;">
+    <div class="section-icon" style="background:#D0BCFF;"></div>
+    <span class="section-title" style="color:#D0BCFF;">Monitoring Layer — Docker Compose (same Droplet)</span>
+    <span class="section-badge" style="background:#352A4D;color:#D0BCFF;">FREE — OPEN SOURCE</span>
+  </div>
+  <table>
+    <tr><th>Component</th><th>Port / Protocol</th><th>Purpose</th></tr>
+    <tr><td class="col-component c-mon">Grafana OSS</td><td class="col-port">:3000 HTTP</td><td class="col-purpose">Monitoring and visualization dashboard. Datasources: Loki (logs), PostgreSQL (fleet metrics). Dashboards: device health heatmap, fleet uptime %, OTA rollout tracker, broadcast delivery rates, RSSI signal map. Alerting via email/Slack.</td></tr>
+    <tr><td class="col-component c-mon">Loki</td><td class="col-port">:3100 HTTP</td><td class="col-purpose">Log aggregation engine. Indexes and stores device syslog data from Rsyslog. Queryable via LogQL in Grafana. Low resource — indexes labels only, stores log lines compressed.</td></tr>
+    <tr><td class="col-component c-mon">Rsyslog</td><td class="col-port">:514 UDP</td><td class="col-purpose">Syslog collector. Receives ESP32 device logs over UDP via WireGuard VPN. Parses, tags by device name, forwards structured logs to Loki for indexing and search.</td></tr>
+  </table>
+
+  <!-- LOCAL STORAGE -->
+  <div class="section" style="background:#1D1B20;">
+    <div class="section-icon" style="background:#CAC4D0;"></div>
+    <span class="section-title" style="color:#CAC4D0;">Local Storage — Droplet 80GB SSD</span>
+    <span class="section-badge" style="background:#25232A;color:#CAC4D0;">INCLUDED WITH DROPLET</span>
+  </div>
+  <table>
+    <tr><th>Path</th><th>Format</th><th>Purpose</th></tr>
+    <tr><td class="col-component c-store">/data/firmware/*.bin</td><td class="col-port">.bin (1-2MB each)</td><td class="col-purpose">ESPHome compiled firmware binaries. Served by Nginx at <code>/firmware/</code>, cached globally by Cloudflare CDN. ESP32 devices pull from nearest CF edge during OTA.</td></tr>
+    <tr><td class="col-component c-store" style="color:#938F99;">(no broadcast storage)</td><td class="col-port">—</td><td class="col-purpose">Broadcasts are MQTT pub/sub only — messages go directly to SmartHome mobile apps via MQTT topics. No files stored on server.</td></tr>
+    <tr><td class="col-component c-store">/data/backups/*.sql.gz</td><td class="col-port">.sql.gz (~50MB)</td><td class="col-purpose">Daily PostgreSQL dumps via <code>pg_dump</code> cron (2am). 7-day retention, auto-cleanup of older files. Full disaster recovery via DO Droplet snapshots ($0.06/GB).</td></tr>
+    <tr><td class="col-component c-store">/pgdata/</td><td class="col-port">Docker volume</td><td class="col-purpose">PostgreSQL persistent data directory. Survives container restarts and redeployments.</td></tr>
+  </table>
+
+  <!-- BACKGROUND SERVICES -->
+  <div class="section" style="background:#1D2B35;">
+    <div class="section-icon" style="background:#7DD0E2;"></div>
+    <span class="section-title" style="color:#7DD0E2;">Background Services — Inside FastAPI Process</span>
+    <span class="section-badge" style="background:#223240;color:#7DD0E2;">ALWAYS RUNNING</span>
+  </div>
+  <table>
+    <tr><th>Service</th><th>Trigger</th><th>Purpose</th></tr>
+    <tr><td class="col-component c-data">Heartbeat Monitor</td><td class="col-port">Every 30s</td><td class="col-purpose">Processes MQTT heartbeat messages (uptime, free heap, RSSI). Updates device status in PostgreSQL. Marks device dead after 90s silence. Triggers Alert Service.</td></tr>
+    <tr><td class="col-component c-data">Device Registrar</td><td class="col-port">On MQTT register</td><td class="col-purpose">Auto-creates new devices in PostgreSQL when ESP32 boots and publishes MAC/version/role. Assigns device to home and community group.</td></tr>
+    <tr><td class="col-component c-data">Broadcast Scheduler</td><td class="col-port">Cron + on-demand</td><td class="col-purpose">Fires scheduled broadcasts at configured times. Enforces Do-Not-Disturb hours per home. Retries undelivered messages for homes that were offline.</td></tr>
+    <tr><td class="col-component c-data">Alert Service</td><td class="col-port">On dead device</td><td class="col-purpose">Sends alerts when critical devices go silent — email (SendGrid), Slack webhook, Home Assistant notification. Configurable per device criticality.</td></tr>
+  </table>
+
+  <div class="footer">Tetradapt — ESP32 Fleet Management — Component Reference — Page 2 of 3</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ PAGE 3 -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-title">ESP32 Fleet Management — Component Reference</span>
+    <span class="page-subtitle">Patient Home &nbsp;|&nbsp; ESP32 Devices &nbsp;|&nbsp; Auth &nbsp;|&nbsp; API Routes</span>
+  </div>
+
+  <!-- PATIENT HOME -->
+  <div class="section" style="background:#1E2B1E;">
+    <div class="section-icon" style="background:#7DCFB6;"></div>
+    <span class="section-title" style="color:#7DCFB6;">Patient Home — Edge (per home)</span>
+    <span class="section-badge" style="background:#24362A;color:#7DCFB6;">NRH | KAISER | ST JUDE | SUTTER HEALTH</span>
+  </div>
+  <table>
+    <tr><th>Component</th><th>Port / Protocol</th><th>Purpose</th></tr>
+    <tr><td class="col-component c-home">Home Assistant</td><td class="col-port">:8123 HTTP</td><td class="col-purpose">Smart home hub. Runs automations, manages ESP32 devices via ESPHome API. Local device control only — broadcasts go to mobile app, not HA.</td></tr>
+    <tr><td class="col-component c-home">WireGuard Client</td><td class="col-port">:51820 UDP</td><td class="col-purpose">VPN tunnel back to fleet server Droplet. Encrypts all MQTT and syslog traffic. Auto-reconnects on network changes.</td></tr>
+    <tr><td class="col-component c-home">SmartHome App</td><td class="col-port">MQTT :1883</td><td class="col-purpose">iOS/Android app subscribes to <code>fleet/broadcast/community/{group}</code> MQTT topics. Shows push notifications. Publishes delivery ACKs back to fleet server. Separate from HA.</td></tr>
+  </table>
+
+  <!-- ESP32 DEVICES -->
+  <div class="section" style="background:#2B2518;">
+    <div class="section-icon" style="background:#E2C87E;"></div>
+    <span class="section-title" style="color:#E2C87E;">ESP32 Devices — ESPHome Firmware (per device)</span>
+    <span class="section-badge" style="background:#33301E;color:#E2C87E;">N DEVICES PER HOME</span>
+  </div>
+  <table>
+    <tr><th>Component</th><th>Interval / Trigger</th><th>Purpose</th></tr>
+    <tr><td class="col-component c-esp">ESPHome Firmware</td><td class="col-port">Always running</td><td class="col-purpose">YAML-configured firmware. Handles WiFi, MQTT, OTA, sensors, heartbeat. No C++ coding — declarative config, version-controlled in Git.</td></tr>
+    <tr><td class="col-component c-esp">MQTT Heartbeat</td><td class="col-port">Every 30s</td><td class="col-purpose">Publishes to <code>fleet/{device}/heartbeat</code> — JSON payload: uptime (seconds), free heap (bytes), WiFi RSSI (dBm).</td></tr>
+    <tr><td class="col-component c-esp">MQTT Register</td><td class="col-port">On boot</td><td class="col-purpose">Publishes to <code>fleet/{device}/register</code> — MAC address, firmware version, device role.</td></tr>
+    <tr><td class="col-component c-esp">OTA Client</td><td class="col-port">On MQTT command</td><td class="col-purpose">Receives OTA command via MQTT. Downloads <code>.bin</code> from Cloudflare CDN URL. Validates checksum, flashes, reboots. ACKs success/failure.</td></tr>
+    <tr><td class="col-component c-esp">Syslog Client</td><td class="col-port">On log event</td><td class="col-purpose">Sends device logs via UDP syslog to fleet server Rsyslog (:514) through WireGuard VPN.</td></tr>
+    <tr><td class="col-component c-esp">Sensors</td><td class="col-port">Varies</td><td class="col-purpose">Fall detection, emergency button, motion sensor, door sensor — varies per home and patient needs. Reports to Home Assistant via ESPHome API.</td></tr>
+    <!-- Broadcasts go to SmartHome mobile app, NOT to ESP32 devices -->
+  </table>
+
+  <!-- AUTH & API -->
+  <div class="section" style="background:#31111D;">
+    <div class="section-icon" style="background:#F2B8B5;"></div>
+    <span class="section-title" style="color:#F2B8B5;">Authentication &amp; Authorization</span>
+    <span class="section-badge" style="background:#3D1A28;color:#F2B8B5;">OAuth2 / JWT</span>
+  </div>
+  <table>
+    <tr><th>Role</th><th>Access Level</th><th>Permissions</th></tr>
+    <tr><td class="col-component" style="color:#F2B8B5;">admin</td><td class="col-port">Full access</td><td class="col-purpose">All API routes. OTA rollouts, broadcast compose/send, device/home/community CRUD, firmware upload, delete operations, audit trail, user management.</td></tr>
+    <tr><td class="col-component" style="color:#F2B8B5;">operator</td><td class="col-port">Operations</td><td class="col-purpose">OTA rollouts, broadcast compose/send, device and community management. No delete operations, no user management.</td></tr>
+    <tr><td class="col-component" style="color:#F2B8B5;">viewer</td><td class="col-port">Read-only</td><td class="col-purpose">Dashboard viewing, fleet status, device health, broadcast delivery reports, log search. No mutations.</td></tr>
+  </table>
+
+  <div class="footer">Tetradapt — ESP32 Fleet Management — Component Reference — Page 3 of 3</div>
+</div>
+
+</body>
+</html>
