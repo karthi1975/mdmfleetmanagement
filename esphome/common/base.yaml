@@ -33,7 +33,10 @@ esphome:
 mqtt:
   id: mqtt_client
   broker: !secret mqtt_broker
-  port: 1883
+  port: 8883
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  certificate_authority: !secret mqtt_ca_certificate
   topic_prefix: "fleet/${device_name}"
   birth_message:
     topic: "fleet/${device_name}/status"
