@@ -5,18 +5,45 @@
 #include "esphome/core/application.h"
 #include "esphome/components/mqtt/mqtt_client.h"
 
+#include "esp_http_client.h"
+#include "esp_https_ota.h"
 #include "esp_ota_ops.h"
-#include "esp_partition.h"
 
-#include <cstring>
 #include <string>
-#include "lwip/sockets.h"
-#include "lwip/netdb.h"
 
 namespace esphome {
 namespace mqtt_ota {
 
 static const char *const TAG = "mqtt_ota";
+
+// Cloudflare Origin CA root — used to validate origin certs served by
+// the fleet broker / firmware host when the OTA URL is https://.
+// PEM is embedded so the firmware needs no filesystem access at runtime.
+static const char *const CF_ORIGIN_CA_PEM = R"(-----BEGIN CERTIFICATE-----
+MIIEADCCAuigAwIBAgIID+rOSdTGfGcwDQYJKoZIhvcNAQELBQAwgYsxCzAJBgNV
+BAYTAlVTMRkwFwYDVQQKExBDbG91ZEZsYXJlLCBJbmMuMTQwMgYDVQQLEytDbG91
+ZEZsYXJlIE9yaWdpbiBTU0wgQ2VydGlmaWNhdGUgQXV0aG9yaXR5MRYwFAYDVQQH
+Ew1TYW4gRnJhbmNpc2NvMRMwEQYDVQQIEwpDYWxpZm9ybmlhMB4XDTE5MDgyMzIx
+MDgwMFoXDTI5MDgxNTE3MDAwMFowgYsxCzAJBgNVBAYTAlVTMRkwFwYDVQQKExBD
+bG91ZEZsYXJlLCBJbmMuMTQwMgYDVQQLEytDbG91ZEZsYXJlIE9yaWdpbiBTU0wg
+Q2VydGlmaWNhdGUgQXV0aG9yaXR5MRYwFAYDVQQHEw1TYW4gRnJhbmNpc2NvMRMw
+EQYDVQQIEwpDYWxpZm9ybmlhMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
+AQEAwEiVZ/UoQpHmFsHvk5isBxRehukP8DG9JhFev3WZtG76WoTthvLJFRKFCHXm
+V6Z5/66Z4S09mgsUuFwvJzMnE6Ej6yIsYNCb9r9QORa8BdhrkNn6kdTly3mdnykb
+OomnwbUfLlExVgNdlP0XoRoeMwbQ4598foiHblO2B/LKuNfJzAMfS7oZe34b+vLB
+yrP/1bgCSLdc1AxQc1AC0EsQQhgcyTJNgnG4va1c7ogPlwKyhbDyZ4e59N5lbYPJ
+SmXI/cAe3jXj1FBLJZkwnoDKe0v13xeF+nF32smSH0qB7aJX2tBMW4TWtFPmzs5I
+lwrFSySWAdwYdgxw180yKU0dvwIDAQABo2YwZDAOBgNVHQ8BAf8EBAMCAQYwEgYD
+VR0TAQH/BAgwBgEB/wIBAjAdBgNVHQ4EFgQUJOhTV118NECHqeuU27rhFnj8KaQw
+HwYDVR0jBBgwFoAUJOhTV118NECHqeuU27rhFnj8KaQwDQYJKoZIhvcNAQELBQAD
+ggEBAHwOf9Ur1l0Ar5vFE6PNrZWrDfQIMyEfdgSKofCdTckbqXNTiXdgbHs+TWoQ
+wAB0pfJDAHJDXOTCWRyTeXOseeOi5Btj5CnEuw3P0oXqdqevM1/+uWp0CM35zgZ8
+VD4aITxity0djzE6Qnx3Syzz+ZkoBgTnNum7d9A66/V636x4vTeqbZFBr9erJzgz
+hhurjcoacvRNhnjtDRM0dPeiCJ50CP3wEYuvUzDHUaowOsnLCjQIkWbR7Ni6KEIk
+MOz2U0OBSif3FTkhCgZWQKOOLo1P42jHC3ssUZAtVNXrCk3fw9/E15k8NPkBazZ6
+0iykLhH1trywrKRMVw67F44IE8Y=
+-----END CERTIFICATE-----
+)";
 
 class MqttOtaComponent : public Component {
  public:
@@ -37,13 +64,11 @@ class MqttOtaComponent : public Component {
 
  private:
   static std::string extract_json_(const std::string &json, const std::string &key) {
-    // Find "key": or "key" : (handles optional whitespace after colon)
     std::string search = "\"" + key + "\"";
     size_t key_pos = json.find(search);
     if (key_pos == std::string::npos) return "";
     size_t colon_pos = json.find(":", key_pos + search.length());
     if (colon_pos == std::string::npos) return "";
-    // Skip whitespace after colon
     size_t quote_start = json.find("\"", colon_pos + 1);
     if (quote_start == std::string::npos) return "";
     size_t quote_end = json.find("\"", quote_start + 1);
@@ -59,32 +84,6 @@ class MqttOtaComponent : public Component {
     ESP_LOGI(TAG, "Status: %s (v%s)", status, version.c_str());
   }
 
-  // Parse URL into host, port, path
-  struct UrlParts {
-    std::string host;
-    int port;
-    std::string path;
-  };
-
-  static bool parse_url_(const std::string &url, UrlParts &parts) {
-    // http://host:port/path
-    if (url.substr(0, 7) != "http://") return false;
-    std::string rest = url.substr(7);
-    size_t slash = rest.find('/');
-    std::string host_port = (slash != std::string::npos) ? rest.substr(0, slash) : rest;
-    parts.path = (slash != std::string::npos) ? rest.substr(slash) : "/";
-
-    size_t colon = host_port.find(':');
-    if (colon != std::string::npos) {
-      parts.host = host_port.substr(0, colon);
-      parts.port = atoi(host_port.substr(colon + 1).c_str());
-    } else {
-      parts.host = host_port;
-      parts.port = 80;
-    }
-    return !parts.host.empty();
-  }
-
   void handle_ota_command_(const std::string &payload) {
     ESP_LOGI(TAG, "OTA command: %s", payload.c_str());
 
@@ -95,170 +94,80 @@ class MqttOtaComponent : public Component {
       return;
     }
 
-    UrlParts parts;
-    if (!parse_url_(url, parts)) {
-      ESP_LOGE(TAG, "Invalid URL: %s", url.c_str());
-      return;
-    }
-
-    ESP_LOGI(TAG, "OTA: version=%s host=%s port=%d path=%s",
-             version.c_str(), parts.host.c_str(), parts.port, parts.path.c_str());
+    bool is_https = url.rfind("https://", 0) == 0;
+    ESP_LOGI(TAG, "OTA: version=%s url=%s (%s)",
+             version.c_str(), url.c_str(), is_https ? "https" : "http");
     publish_status_("downloading", version);
 
-    // Resolve host
-    struct addrinfo hints = {}, *res = nullptr;
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    char port_str[8];
-    snprintf(port_str, sizeof(port_str), "%d", parts.port);
+    // Configure HTTP client. For https:// pin to the CF Origin CA so
+    // we trust only origin certs issued under that root; for http://
+    // leave cert_pem null.
+    esp_http_client_config_t http_cfg = {};
+    http_cfg.url = url.c_str();
+    http_cfg.timeout_ms = 30000;
+    http_cfg.keep_alive_enable = true;
+    if (is_https) {
+      http_cfg.cert_pem = CF_ORIGIN_CA_PEM;
+    }
 
-    if (getaddrinfo(parts.host.c_str(), port_str, &hints, &res) != 0 || !res) {
-      ESP_LOGE(TAG, "DNS resolve failed for %s", parts.host.c_str());
+    esp_https_ota_config_t ota_cfg = {};
+    ota_cfg.http_config = &http_cfg;
+
+    esp_https_ota_handle_t handle = nullptr;
+    esp_err_t err = esp_https_ota_begin(&ota_cfg, &handle);
+    if (err != ESP_OK || handle == nullptr) {
+      ESP_LOGE(TAG, "esp_https_ota_begin failed: %s", esp_err_to_name(err));
       publish_status_("failed", version);
       return;
     }
 
-    int sock = lwip_socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (sock < 0 || lwip_connect(sock, res->ai_addr, res->ai_addrlen) != 0) {
-      ESP_LOGE(TAG, "Connection failed");
-      freeaddrinfo(res);
-      if (sock >= 0) lwip_close(sock);
-      publish_status_("failed", version);
-      return;
-    }
-    freeaddrinfo(res);
-
-    // Recv timeout: fail loudly instead of hanging if the stream stalls.
-    struct timeval tv = {};
-    tv.tv_sec = 15;
-    lwip_setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-
-    // Send HTTP GET request — Connection: close so server FINs after body.
-    char request[512];
-    snprintf(request, sizeof(request),
-             "GET %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n",
-             parts.path.c_str(), parts.host.c_str());
-    lwip_send(sock, request, strlen(request), 0);
-
-    // Read HTTP response header
-    char header_buf[1024];
-    int header_len = 0;
-    bool header_done = false;
-    int content_length = -1;
-
-    while (!header_done && header_len < (int)sizeof(header_buf) - 1) {
-      int n = lwip_recv(sock, header_buf + header_len, 1, 0);
-      if (n <= 0) break;
-      header_len += n;
-      header_buf[header_len] = 0;
-      if (header_len >= 4 && strcmp(header_buf + header_len - 4, "\r\n\r\n") == 0) {
-        header_done = true;
-      }
-    }
-
-    if (!header_done) {
-      ESP_LOGE(TAG, "Failed to read HTTP header");
-      lwip_close(sock);
-      publish_status_("failed", version);
-      return;
-    }
-
-    // Check HTTP 200
-    if (strstr(header_buf, "200") == nullptr) {
-      ESP_LOGE(TAG, "HTTP error: %.*s", 32, header_buf);
-      lwip_close(sock);
-      publish_status_("failed", version);
-      return;
-    }
-
-    // Extract content length
-    char *cl = strcasestr(header_buf, "content-length:");
-    if (cl) {
-      content_length = atoi(cl + 15);
-    }
-    ESP_LOGI(TAG, "Firmware size: %d bytes", content_length);
-
-    // Begin OTA flash
+    int total_size = esp_https_ota_get_image_size(handle);
+    ESP_LOGI(TAG, "Firmware size: %d bytes", total_size);
     publish_status_("flashing", version);
 
-    const esp_partition_t *update_partition = esp_ota_get_next_update_partition(nullptr);
-    if (!update_partition) {
-      ESP_LOGE(TAG, "No OTA partition found");
-      lwip_close(sock);
-      publish_status_("failed", version);
-      return;
-    }
+    // Stream loop. Long downloads on the main task starve IDLE and trip
+    // the task WDT — feed it every iteration and pump the MQTT loop
+    // every ~32 KB so keepalive survives.
+    int last_pump = 0;
+    while (true) {
+      err = esp_https_ota_perform(handle);
+      if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS) break;
 
-    esp_ota_handle_t ota_handle;
-    esp_err_t err = esp_ota_begin(update_partition, content_length > 0 ? content_length : OTA_SIZE_UNKNOWN, &ota_handle);
-    if (err != ESP_OK) {
-      ESP_LOGE(TAG, "OTA begin failed: %s", esp_err_to_name(err));
-      lwip_close(sock);
-      publish_status_("failed", version);
-      return;
-    }
-
-    // Stream firmware data to OTA partition.
-    // Long downloads on the main task can starve the IDLE task and trip the
-    // task WDT — yield every chunk and pump MQTT so keepalive survives.
-    uint8_t buf[1024];
-    int total = 0;
-    int since_pump = 0;
-    while (content_length < 0 || total < content_length) {
-      int n = lwip_recv(sock, buf, sizeof(buf), 0);
-      if (n < 0) {
-        ESP_LOGE(TAG, "recv failed/timeout after %d bytes", total);
-        esp_ota_abort(ota_handle);
-        lwip_close(sock);
-        publish_status_("failed", version);
-        return;
-      }
-      if (n == 0) break;  // FIN
-      err = esp_ota_write(ota_handle, buf, n);
-      if (err != ESP_OK) {
-        ESP_LOGE(TAG, "OTA write failed: %s", esp_err_to_name(err));
-        esp_ota_abort(ota_handle);
-        lwip_close(sock);
-        publish_status_("failed", version);
-        return;
-      }
-      total += n;
-      since_pump += n;
+      int read = esp_https_ota_get_image_len_read(handle);
       App.feed_wdt();
-      if (since_pump >= 32 * 1024) {
+      if (read - last_pump >= 32 * 1024) {
         mqtt::global_mqtt_client->loop();
-        since_pump = 0;
-        ESP_LOGI(TAG, "OTA progress: %d/%d", total, content_length);
+        last_pump = read;
+        ESP_LOGI(TAG, "OTA progress: %d/%d", read, total_size);
       }
       delay(1);
     }
-    lwip_close(sock);
 
-    if (content_length > 0 && total != content_length) {
-      ESP_LOGE(TAG, "Short read: %d/%d", total, content_length);
-      esp_ota_abort(ota_handle);
-      publish_status_("failed", version);
-      return;
-    }
-
-    ESP_LOGI(TAG, "Wrote %d bytes", total);
-
-    err = esp_ota_end(ota_handle);
     if (err != ESP_OK) {
-      ESP_LOGE(TAG, "OTA end failed: %s", esp_err_to_name(err));
+      ESP_LOGE(TAG, "esp_https_ota_perform failed: %s", esp_err_to_name(err));
+      esp_https_ota_abort(handle);
       publish_status_("failed", version);
       return;
     }
 
-    err = esp_ota_set_boot_partition(update_partition);
+    if (!esp_https_ota_is_complete_data_received(handle)) {
+      ESP_LOGE(TAG, "OTA: incomplete data");
+      esp_https_ota_abort(handle);
+      publish_status_("failed", version);
+      return;
+    }
+
+    err = esp_https_ota_finish(handle);
     if (err != ESP_OK) {
-      ESP_LOGE(TAG, "Set boot partition failed: %s", esp_err_to_name(err));
+      ESP_LOGE(TAG, "esp_https_ota_finish failed: %s", esp_err_to_name(err));
       publish_status_("failed", version);
       return;
     }
 
-    ESP_LOGI(TAG, "OTA success! Rebooting...");
+    int total_read = esp_https_ota_get_image_len_read(handle);
+    ESP_LOGI(TAG, "OTA success! Wrote %d bytes. Rebooting...", total_read);
     publish_status_("success", version);
+
     // Pump the MQTT client loop so the success publish actually flushes
     // before we reboot (delay() alone leaves it queued).
     for (int i = 0; i < 60; i++) {
