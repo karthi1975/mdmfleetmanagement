@@ -7,7 +7,7 @@ datasources:
     user: fleet
     database: fleet_db
     secureJsonData:
-      password: fleet_secret
+      password: $POSTGRES_PASSWORD
     jsonData:
       sslmode: disable
       maxOpenConns: 5
