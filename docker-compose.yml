@@ -18,8 +18,10 @@ services:
     image: eclipse-mosquitto:2
     ports:
       - "1883:1883"
+      - "8883:8883"
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./ssl:/mosquitto/certs:ro
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
 
@@ -27,9 +29,11 @@ services:
     image: nginx:alpine
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./data/firmware:/usr/share/nginx/firmware:ro
+      - ./ssl:/etc/nginx/ssl:ro
     depends_on:
       - fleet-api
 

@@ -44,3 +44,6 @@ esphome/secrets.yaml
 # Coverage
 htmlcov/
 .coverage
+
+# TLS certs / keys (CF Origin bundle; deployed out-of-band)
+ssl/
