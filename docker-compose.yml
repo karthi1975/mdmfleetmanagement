@@ -16,8 +16,9 @@ services:
 
   mosquitto:
     image: eclipse-mosquitto:2
+    expose:
+      - "1883"   # internal only for fleet-api
     ports:
-      - "1883:1883"
       - "8883:8883"
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
@@ -42,8 +43,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"   # internal only, nginx proxies 443/80 -> here
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-fleet}:${POSTGRES_PASSWORD:-fleet_secret}@postgres:5432/${POSTGRES_DB:-fleet_db}
