@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from fleet_server.api import (
     auth,
@@ -10,27 +10,41 @@ from fleet_server.api import (
     ota,
     provisioning,
 )
+from fleet_server.api.auth import require_role
 
 api_router = APIRouter()
 
-# Auth — public (login) + admin-only (user create)
+# Public: login + /me (routes inside auth.router apply their own guards).
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 
-# Fleet resources — protected by role guards in each route
-api_router.include_router(devices.router, prefix="/devices", tags=["devices"])
-api_router.include_router(homes.router, prefix="/homes", tags=["homes"])
+# All other resource routers require at least a valid JWT (any role).
+# Tighter role checks (e.g. admin-only mutations) are applied per-route.
+_any_auth = [Depends(require_role("admin", "operator", "viewer"))]
+
 api_router.include_router(
-    communities.router, prefix="/communities", tags=["communities"]
+    devices.router, prefix="/devices", tags=["devices"], dependencies=_any_auth
+)
+api_router.include_router(
+    homes.router, prefix="/homes", tags=["homes"], dependencies=_any_auth
+)
+api_router.include_router(
+    communities.router,
+    prefix="/communities",
+    tags=["communities"],
+    dependencies=_any_auth,
+)
+api_router.include_router(
+    broadcast.router, prefix="/broadcast", tags=["broadcast"], dependencies=_any_auth
+)
+api_router.include_router(
+    firmware.router, prefix="/firmware", tags=["firmware"], dependencies=_any_auth
+)
+api_router.include_router(
+    ota.router, prefix="/ota", tags=["ota"], dependencies=_any_auth
 )
 
-# Broadcast — separate REST service (FCM push)
-api_router.include_router(
-    broadcast.router, prefix="/broadcast", tags=["broadcast"]
-)
-
-# Firmware & OTA
-api_router.include_router(firmware.router, prefix="/firmware", tags=["firmware"])
-api_router.include_router(ota.router, prefix="/ota", tags=["ota"])
+# Provisioning mixes public (ESP Web Tools manifest + firmware download)
+# and authenticated (/provision, /jobs) endpoints. Guards live per-route.
 api_router.include_router(
     provisioning.router, prefix="/provisioning", tags=["provisioning"]
 )

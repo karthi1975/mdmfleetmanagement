@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fleet_server.api.auth import require_role
 from fleet_server.config import settings
 from fleet_server.database import get_db
 from fleet_server.models.provision_job import ProvisionJob
@@ -22,7 +23,12 @@ from fleet_server.services.provisioning import ProvisioningService
 router = APIRouter()
 
 
-@router.post("/provision", response_model=ProvisionJobResponse, status_code=202)
+@router.post(
+    "/provision",
+    response_model=ProvisionJobResponse,
+    status_code=202,
+    dependencies=[Depends(require_role("admin", "operator"))],
+)
 async def provision(
     payload: ProvisionRequest,
     background: BackgroundTasks,
@@ -34,7 +40,11 @@ async def provision(
     return job
 
 
-@router.get("/jobs/{job_id}", response_model=ProvisionJobResponse)
+@router.get(
+    "/jobs/{job_id}",
+    response_model=ProvisionJobResponse,
+    dependencies=[Depends(require_role("admin", "operator", "viewer"))],
+)
 async def get_job(job_id: str, db: AsyncSession = Depends(get_db)):
     job = (
         await db.execute(select(ProvisionJob).where(ProvisionJob.id == job_id))
