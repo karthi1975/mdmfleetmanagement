@@ -91,12 +91,14 @@ services:
 
   grafana:
     image: grafana/grafana-oss:10.4.0
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"   # internal only; nginx proxies /grafana/ -> here
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_UNIFIED_ALERTING_ENABLED: "true"
+      GF_SERVER_ROOT_URL: "https://mdmfleetmanagment.homeadapt.us/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
       GF_AUTH_LOGIN_COOKIE_NAME: "smarthome_session"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/etc/grafana/provisioning/dashboards/json/fleet-overview.json"
       GF_USERS_DEFAULT_THEME: "light"
