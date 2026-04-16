@@ -4,7 +4,7 @@
 substitutions:
   device_name: "esp32-test"
   device_role: "sensor"
-  firmware_version: "10.0.0"
+  firmware_version: "12.0.0"
 
 packages:
   base: !include ../common/base.yaml
@@ -28,7 +28,7 @@ light:
 
 # Blink LED every 2s — visible proof that OTA v2.0.0 landed
 interval:
-  - interval: 2s
+  - interval: 250ms
     then:
       - light.toggle: onboard_led
 

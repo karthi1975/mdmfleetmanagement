@@ -198,9 +198,12 @@ class MqttOtaComponent : public Component {
       return;
     }
 
-    // Stream firmware data to OTA partition
+    // Stream firmware data to OTA partition.
+    // Long downloads on the main task can starve the IDLE task and trip the
+    // task WDT — yield every chunk and pump MQTT so keepalive survives.
     uint8_t buf[1024];
     int total = 0;
+    int since_pump = 0;
     while (content_length < 0 || total < content_length) {
       int n = lwip_recv(sock, buf, sizeof(buf), 0);
       if (n < 0) {
@@ -220,6 +223,14 @@ class MqttOtaComponent : public Component {
         return;
       }
       total += n;
+      since_pump += n;
+      App.feed_wdt();
+      if (since_pump >= 32 * 1024) {
+        mqtt::global_mqtt_client->loop();
+        since_pump = 0;
+        ESP_LOGI(TAG, "OTA progress: %d/%d", total, content_length);
+      }
+      delay(1);
     }
     lwip_close(sock);
 
