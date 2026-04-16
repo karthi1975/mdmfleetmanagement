@@ -21,6 +21,7 @@ services:
       - "8883:8883"
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./mosquitto/config_runtime/passwd:/mosquitto/config/passwd:ro
       - ./ssl:/mosquitto/certs:ro
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log

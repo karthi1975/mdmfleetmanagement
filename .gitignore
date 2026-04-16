@@ -47,3 +47,6 @@ htmlcov/
 
 # TLS certs / keys (CF Origin bundle; deployed out-of-band)
 ssl/
+
+# Mosquitto runtime auth (password hash file; deployed out-of-band)
+mosquitto/config_runtime/
