@@ -1,8 +1,9 @@
-"""ESPHome external component: MQTT-triggered HTTP OTA for fleet management."""
+"""ESPHome external component: MQTT-triggered HTTP/HTTPS OTA for fleet management."""
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import CONF_ID
+from esphome.components.esp32 import include_builtin_idf_component
 
 DEPENDENCIES = ["mqtt"]
 
@@ -19,8 +20,8 @@ CONFIG_SCHEMA = cv.Schema(
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
-
-    # Ensure esp_http_client and esp_https_ota IDF components are included
-    cg.add_platformio_option(
-        "build_flags", ["-DUSE_MQTT_OTA"]
-    )
+    cg.add_platformio_option("build_flags", ["-DUSE_MQTT_OTA"])
+    # ESP-IDF built-in components used by mqtt_ota.h — both excluded by
+    # default in DEFAULT_EXCLUDED_IDF_COMPONENTS, so re-enable.
+    include_builtin_idf_component("esp_http_client")
+    include_builtin_idf_component("esp_https_ota")

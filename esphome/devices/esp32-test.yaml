@@ -4,7 +4,7 @@
 substitutions:
   device_name: "esp32-test"
   device_role: "sensor"
-  firmware_version: "13.0.0"
+  firmware_version: "15.0.0"
 
 packages:
   base: !include ../common/base.yaml
