@@ -41,6 +41,9 @@ _cookie = APIKeyCookie(name=COOKIE_NAME, auto_error=False)
 # ─── Schemas ────────────────────────────────────────────────────────
 
 class LoginRequest(BaseModel):
+    # Accepts either an email (admin@tetradapt.com) or a short
+    # user_id (admin). Field is called `email` for backwards compat
+    # with existing clients; the server resolves either form.
     email: str
     password: str
 
@@ -184,7 +187,12 @@ async def login(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(User).where(User.email == payload.email))
+    # Look up by email first, then fall back to user_id (so "admin"
+    # works just as well as "admin@tetradapt.com").
+    identifier = payload.email.strip()
+    result = await db.execute(
+        select(User).where((User.email == identifier) | (User.id == identifier))
+    )
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(payload.password, user.hashed_password):
