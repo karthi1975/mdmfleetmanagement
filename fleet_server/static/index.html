@@ -10,6 +10,8 @@
       --border: #e5e7eb; --accent: #2563eb; --ok: #047857; --err: #b91c1c; --warn: #b45309;
     }
     * { box-sizing: border-box; }
+    /* hidden attribute must actually hide, even when other rules set display */
+    [hidden] { display: none !important; }
     body {
       font-family: -apple-system, system-ui, 'Segoe UI', sans-serif;
       background: var(--bg); color: var(--text);
