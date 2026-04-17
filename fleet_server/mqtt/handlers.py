@@ -14,6 +14,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fleet_server.models.device import Device
+from fleet_server.models.home import Home
 from fleet_server.models.ota_event import OTAEvent
 
 logger = logging.getLogger(__name__)
@@ -100,7 +101,22 @@ async def handle_registration(device_name: str, raw_payload: str, db: AsyncSessi
     mac = data.get("mac", "unknown")
     version = data.get("version", "unknown")
     role = data.get("role", "sensor")
+    home_id = (data.get("home_id") or "").strip() or None
+    display_name = (data.get("label") or "").strip() or None
     now = datetime.now(timezone.utc)
+
+    # FK requires the home row to exist before the device references it.
+    # If the installer typed a new home_id in the captive portal, auto-
+    # create a placeholder home. An operator can fill in patient_name
+    # and address from the admin console later.
+    if home_id is not None:
+        existing_home = await db.execute(
+            select(Home).where(Home.home_id == home_id)
+        )
+        if existing_home.scalar_one_or_none() is None:
+            db.add(Home(home_id=home_id, patient_name=home_id))
+            await db.flush()
+            logger.info("Auto-created home '%s' on device registration", home_id)
 
     result = await db.execute(
         select(Device).where(Device.device_id == device_name)
@@ -113,9 +129,16 @@ async def handle_registration(device_name: str, raw_payload: str, db: AsyncSessi
         existing.role = role
         existing.status = "alive"
         existing.last_seen = now
+        if home_id is not None:
+            existing.home_id = home_id
+        if display_name is not None:
+            existing.display_name = display_name
         await db.commit()
         await db.refresh(existing)
-        logger.info("Device re-registered: %s (v%s)", device_name, version)
+        logger.info(
+            "Device re-registered: %s (v%s, home=%s, label=%s)",
+            device_name, version, home_id, display_name,
+        )
         return existing
 
     device = Device(
@@ -125,11 +148,16 @@ async def handle_registration(device_name: str, raw_payload: str, db: AsyncSessi
         role=role,
         status="alive",
         last_seen=now,
+        home_id=home_id,
+        display_name=display_name,
     )
     db.add(device)
     await db.commit()
     await db.refresh(device)
-    logger.info("New device registered: %s (v%s, role=%s)", device_name, version, role)
+    logger.info(
+        "New device registered: %s (v%s, role=%s, home=%s, label=%s)",
+        device_name, version, role, home_id, display_name,
+    )
     return device
 
 

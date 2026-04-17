@@ -26,9 +26,12 @@ esphome:
           qos: 1
           retain: true
           payload: !lambda |-
-            return "{\"mac\":\"" + get_mac_address_pretty() +
+            auto &pp = *id(provision);
+            return std::string("{\"mac\":\"") + get_mac_address_pretty() +
                    "\",\"version\":\"${firmware_version}\"" +
-                   ",\"role\":\"${device_role}\"}";
+                   ",\"role\":\"${device_role}\"" +
+                   ",\"home_id\":\"" + pp.get_home_id() + "\"" +
+                   ",\"label\":\"" + pp.get_device_label() + "\"}";
 
 mqtt:
   id: mqtt_client
@@ -86,12 +89,15 @@ logger:
   # Fleet server subscribes to fleet/{device}/log and pushes to Loki
 
 wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
-  # Never reboot just because WiFi is missing — at first install the
-  # device must stay alive in AP mode indefinitely so the installer
-  # can reach the captive portal. After provisioning, ESPHome persists
-  # the real credentials in NVS and uses them on subsequent boots.
+  # No compiled-in ssid/password on purpose. ESPHome keys the NVS
+  # preference for saved wifi creds under get_config_version_hash() when
+  # has_sta() is true (any compiled-in network), and under the constant
+  # 88491487UL when it's false. Any YAML change — including a
+  # firmware_version bump — rotates config_version_hash and orphans
+  # prior captive-portal-saved creds, which is why devices used to
+  # fall back to AP mode after every OTA. Omitting ssid/password keeps
+  # has_sta() false at boot, so NVS is keyed under the stable constant
+  # and captive-portal creds survive across firmware versions.
   reboot_timeout: 0s
   power_save_mode: none
   ap:
@@ -102,9 +108,11 @@ wifi:
     ap_timeout: 30s
 
 # Serves a simple page at http://192.168.4.1/ while the device is
-# running as an AP, letting the installer pick the home's WiFi and
-# enter the password. Auto-saves to NVS.
-captive_portal:
+# running as an AP. The custom form collects WiFi creds + home_id +
+# device label and persists them to NVS at a stable hash so values
+# survive OTAs (see esphome/components/provision_portal/).
+provision_portal:
+  id: provision
 
 # Factory reset — long-press the BOOT button (GPIO0) for 10s to wipe
 # saved WiFi creds and put the device back into on-boarding mode.
