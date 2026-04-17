@@ -251,6 +251,9 @@ $('loginForm').addEventListener('submit', async e => {
     localStorage.setItem(TOKEN_KEY, data.access_token);
     localStorage.setItem(ROLE_KEY, data.role);
     localStorage.setItem(EMAIL_KEY, email);
+    // Standalone /admin/: send user straight to the unified /grafana/ view.
+    // Embedded iframe: just reveal the dashboard inside.
+    if (!EMBEDDED) { window.location.href = '/grafana/'; return; }
     showApp();
   } catch (err) {
     $('loginMsg').hidden = false;
@@ -261,6 +264,10 @@ $('loginForm').addEventListener('submit', async e => {
 $('logoutBtn').addEventListener('click', async () => {
   try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); } catch {}
   logout();
+  // Break out of the Grafana iframe to the login page.
+  try {
+    if (window.top !== window.self) window.top.location.href = '/admin/';
+  } catch { /* cross-origin — ignore */ }
 });
 
 // Embedded mode — hide outer chrome when rendered inside Grafana iframe.
@@ -463,8 +470,10 @@ async function boot() {
       const u = await r.json();
       localStorage.setItem(EMAIL_KEY, u.email);
       localStorage.setItem(ROLE_KEY, u.role);
-      // Sentinel — tells headers() to skip the bearer header (cookie suffices).
       if (!localStorage.getItem(TOKEN_KEY)) localStorage.setItem(TOKEN_KEY, 'cookie');
+      // Already authed + standalone /admin/? Punt them to the unified
+      // view so /admin/ behaves like a login-only page.
+      if (!EMBEDDED) { window.location.href = '/grafana/'; return; }
       showApp();
       return;
     }
