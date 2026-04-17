@@ -219,6 +219,10 @@ async def login(
 @router.post("/logout")
 async def logout(response: Response):
     response.delete_cookie(COOKIE_NAME, path="/")
+    # Nuke everything the browser has stored for this origin: cookies
+    # (incl. Grafana's own session), localStorage, cached responses.
+    # Ensures no stale authed page survives the sign-out.
+    response.headers["Clear-Site-Data"] = '"cookies", "storage", "cache"'
     return {"ok": True}
 
 

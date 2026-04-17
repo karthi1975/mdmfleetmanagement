@@ -262,12 +262,18 @@ $('loginForm').addEventListener('submit', async e => {
 });
 
 $('logoutBtn').addEventListener('click', async () => {
+  // 1) Ask Grafana to drop its own session cookie too.
+  try { await fetch('/grafana/logout', { method: 'POST', credentials: 'include' }); } catch {}
+  // 2) Our server clears mdm_session AND sends Clear-Site-Data to wipe
+  //    cookies/storage/cache for the whole origin.
   try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); } catch {}
-  logout();
-  // Break out of the Grafana iframe to the login page.
+  localStorage.clear();
+  // 3) Break out of the Grafana iframe with a replace() — no back-button
+  //    resurrecting the signed-in page.
   try {
-    if (window.top !== window.self) window.top.location.href = '/admin/';
-  } catch { /* cross-origin — ignore */ }
+    const top = (window.top !== window.self) ? window.top : window;
+    top.location.replace('/admin/');
+  } catch { window.location.replace('/admin/'); }
 });
 
 // Embedded mode — hide outer chrome when rendered inside Grafana iframe.
