@@ -277,8 +277,13 @@ if (EMBEDDED) {
   document.documentElement.classList.add('embedded');
   const style = document.createElement('style');
   style.textContent = `
-    .embedded #pageHeader { display: none; }
-    .embedded main { margin-top: 0.5rem; padding: 0 0.75rem; max-width: 100%; }
+    .embedded #pageHeader {
+      padding: 0.35rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      background: transparent;
+    }
+    .embedded #pageHeader h1 { font-size: 0.85rem; color: var(--muted); font-weight: 500; }
+    .embedded main { margin-top: 0.75rem; padding: 0 0.75rem; max-width: 100%; }
     .embedded body { background: transparent; }
   `;
   document.head.appendChild(style);
