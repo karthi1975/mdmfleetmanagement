@@ -190,13 +190,23 @@ const ROLE_KEY = 'mdm_role';
 const EMAIL_KEY = 'mdm_email';
 
 // ── Auth ──────────────────────────────────────────────────────────
+// Cookie (mdm_session, HttpOnly) is the source of truth. localStorage
+// is a convenience cache for the displayed email/role; the iframe
+// version doesn't need it because /api/auth/me reads the cookie.
 function token() { return localStorage.getItem(TOKEN_KEY); }
 function headers() {
   const t = token();
-  return t ? { 'Authorization': 'Bearer ' + t, 'Content-Type': 'application/json' } : {};
+  // Cookie auto-attaches via credentials:'include' on every request;
+  // bearer header is only used when a real token is cached locally.
+  if (t && t !== 'cookie') return { 'Authorization': 'Bearer ' + t, 'Content-Type': 'application/json' };
+  return { 'Content-Type': 'application/json' };
 }
 async function api(path, opts = {}) {
-  const r = await fetch(path, { ...opts, headers: { ...headers(), ...(opts.headers || {}) } });
+  const r = await fetch(path, {
+    ...opts,
+    credentials: 'include',
+    headers: { ...headers(), ...(opts.headers || {}) },
+  });
   if (r.status === 401) { logout(); throw new Error('unauthorized'); }
   if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
   if (r.status === 204) return null;
@@ -210,7 +220,9 @@ function showLogin() {
 function showApp() {
   $('loginScreen').hidden = true;
   $('app').hidden = false;
-  $('who').textContent = `${localStorage.getItem(EMAIL_KEY)} (${localStorage.getItem(ROLE_KEY)})`;
+  const email = localStorage.getItem(EMAIL_KEY) || '';
+  const role = localStorage.getItem(ROLE_KEY) || '';
+  $('who').textContent = email ? `${email} (${role})` : '';
   refresh();
 }
 function logout() {
@@ -402,9 +414,12 @@ $('fwUploadBtn').addEventListener('click', async () => {
 
     // NOTE: do NOT set Content-Type — the browser sets it with the
     // multipart boundary automatically when body is a FormData.
+    const t = token();
+    const hdrs = (t && t !== 'cookie') ? { 'Authorization': 'Bearer ' + t } : {};
     const r = await fetch('/api/firmware/', {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token() },
+      credentials: 'include',
+      headers: hdrs,
       body: fd,
     });
 
@@ -433,8 +448,28 @@ setInterval(() => {
   if (!$('app').hidden) { loadDevices(); loadEvents(); }
 }, 10000);
 
+// Firmware upload uses FormData — needs credentials:'include' too.
+// (Kept the inline fetch above intact, just adding the credential.)
+
 // ── Boot ──────────────────────────────────────────────────────────
-if (token()) showApp(); else showLogin();
+// Cookie is the truth: ask /api/auth/me. If 200, populate cache and
+// show the dashboard; otherwise show the login form.
+async function boot() {
+  try {
+    const r = await fetch('/api/auth/me', { credentials: 'include' });
+    if (r.ok) {
+      const u = await r.json();
+      localStorage.setItem(EMAIL_KEY, u.email);
+      localStorage.setItem(ROLE_KEY, u.role);
+      // Sentinel — tells headers() to skip the bearer header (cookie suffices).
+      if (!localStorage.getItem(TOKEN_KEY)) localStorage.setItem(TOKEN_KEY, 'cookie');
+      showApp();
+      return;
+    }
+  } catch (e) { /* network error → fall through to login */ }
+  showLogin();
+}
+boot();
 </script>
 </body>
 </html>
