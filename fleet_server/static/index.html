@@ -119,6 +119,33 @@
     </div>
 
     <div class="card">
+      <h2>Upload firmware</h2>
+      <div class="grid">
+        <div>
+          <div class="row">
+            <label for="fwVersion">Version (semver)</label>
+            <input type="text" id="fwVersion" placeholder="e.g. 16.0.0" />
+          </div>
+          <div class="row">
+            <label for="fwNotes">Release notes (optional)</label>
+            <input type="text" id="fwNotes" placeholder="What changed in this build" />
+          </div>
+        </div>
+        <div>
+          <div class="row">
+            <label for="fwFile">Firmware binary (.bin)</label>
+            <input type="file" id="fwFile" accept=".bin,application/octet-stream" />
+            <small style="color:var(--muted); display:block; margin-top:0.3rem">
+              Pick <code>firmware.ota.bin</code> from <code>esphome/devices/.esphome/build/&lt;device&gt;/.pioenvs/&lt;device&gt;/</code> after <code>esphome compile</code>.
+            </small>
+          </div>
+        </div>
+      </div>
+      <button id="fwUploadBtn" class="primary">Upload firmware</button>
+      <div id="fwMsg" class="msg" hidden></div>
+    </div>
+
+    <div class="card">
       <h2>Trigger OTA rollout</h2>
       <div class="grid">
         <div>
@@ -328,6 +355,60 @@ function showOtaMsg(cls, text) {
   el.className = 'msg ' + cls;
   el.textContent = text;
 }
+
+// ── Firmware upload ──────────────────────────────────────────────
+function showFwMsg(cls, text) {
+  const el = $('fwMsg');
+  el.hidden = false;
+  el.className = 'msg ' + cls;
+  el.textContent = text;
+}
+
+$('fwUploadBtn').addEventListener('click', async () => {
+  const version = $('fwVersion').value.trim();
+  const notes = $('fwNotes').value.trim();
+  const file = $('fwFile').files[0];
+
+  if (!version) return showFwMsg('err', 'Version is required');
+  if (!/^\d+\.\d+\.\d+/.test(version)) return showFwMsg('err', 'Version should look like 1.2.3');
+  if (!file) return showFwMsg('err', 'Pick a .bin file');
+
+  $('fwUploadBtn').disabled = true;
+  showFwMsg('ok', `Uploading ${file.name} (${file.size.toLocaleString()} bytes)…`);
+
+  try {
+    const fd = new FormData();
+    fd.append('version', version);
+    fd.append('release_notes', notes);
+    fd.append('file', file);
+
+    // NOTE: do NOT set Content-Type — the browser sets it with the
+    // multipart boundary automatically when body is a FormData.
+    const r = await fetch('/api/firmware/', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token() },
+      body: fd,
+    });
+
+    if (r.status === 401) { logout(); return; }
+    if (r.status === 413) throw new Error('File too large (nginx limit hit)');
+
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 409) throw new Error(`Version ${version} already exists`);
+    if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+
+    showFwMsg('ok',
+      `Uploaded v${data.version} (checksum ${data.checksum.slice(0, 12)}…). It now appears in the Firmware list and the OTA dropdown.`);
+    $('fwVersion').value = '';
+    $('fwNotes').value = '';
+    $('fwFile').value = '';
+    await loadFirmware();
+  } catch (err) {
+    showFwMsg('err', err.message);
+  } finally {
+    $('fwUploadBtn').disabled = false;
+  }
+});
 
 // Auto-refresh devices + events every 10s
 setInterval(() => {

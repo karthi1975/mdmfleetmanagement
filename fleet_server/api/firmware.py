@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fleet_server.api.auth import require_role
 from fleet_server.database import get_db
 from fleet_server.schemas.firmware import FirmwareResponse
 from fleet_server.services.firmware import FirmwareService
@@ -14,7 +15,12 @@ def get_service(db: AsyncSession = Depends(get_db)) -> FirmwareService:
     return FirmwareService(db)
 
 
-@router.post("/", response_model=FirmwareResponse, status_code=201)
+@router.post(
+    "/",
+    response_model=FirmwareResponse,
+    status_code=201,
+    dependencies=[Depends(require_role("admin", "operator"))],
+)
 async def upload_firmware(
     version: str = Form(...),
     release_notes: str = Form(""),
