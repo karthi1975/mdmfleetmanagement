@@ -8,7 +8,12 @@
 #include "esphome/components/web_server_base/web_server_base.h"
 #include "esphome/components/wifi/wifi_component.h"
 
+#ifdef USE_ESP32
+#include "dns_server.h"
+#endif
+
 #include <cstring>
+#include <memory>
 #include <string>
 
 namespace esphome {
@@ -33,10 +38,7 @@ class ProvisionPortal : public AsyncWebHandler, public Component {
  public:
   explicit ProvisionPortal(web_server_base::WebServerBase *base) : base_(base) {}
 
-  float get_setup_priority() const override {
-    // After WiFi setup so wifi::global_wifi_component is valid.
-    return setup_priority::WIFI - 1.0f;
-  }
+  float get_setup_priority() const override { return setup_priority::WIFI - 1.0f; }
 
   void setup() override {
     this->pref_ = global_preferences->make_preference<ProvisionSettings>(PREF_HASH, true);
@@ -44,7 +46,7 @@ class ProvisionPortal : public AsyncWebHandler, public Component {
     if (this->pref_.load(&s)) {
       this->home_id_ = s.home_id;
       this->device_label_ = s.device_label;
-      ESP_LOGI(TAG, "Loaded: home_id='%s' label='%s'",
+      ESP_LOGI(TAG, "Loaded NVS: home_id='%s' label='%s'",
                this->home_id_.c_str(), this->device_label_.c_str());
     } else {
       ESP_LOGI(TAG, "No stored provisioning settings yet");
@@ -53,25 +55,53 @@ class ProvisionPortal : public AsyncWebHandler, public Component {
     this->base_->add_handler_without_auth(this);
   }
 
+  void loop() override {
+#ifdef USE_ESP32
+    const bool ap = wifi::global_wifi_component != nullptr &&
+                    wifi::global_wifi_component->is_ap_active();
+    if (ap && this->dns_server_ == nullptr) {
+      this->dns_server_ = make_unique<DNSServer>();
+      this->dns_server_->start(wifi::global_wifi_component->wifi_soft_ap_ip());
+      ESP_LOGI(TAG, "AP up — DNS redirector started");
+    } else if (!ap && this->dns_server_ != nullptr) {
+      this->dns_server_->stop();
+      this->dns_server_.reset();
+      ESP_LOGI(TAG, "AP down — DNS redirector stopped");
+      return;
+    }
+    if (this->dns_server_ != nullptr) {
+      this->dns_server_->process_next_request();
+    }
+#endif
+  }
+
   void dump_config() override {
     ESP_LOGCONFIG(TAG, "Provision Portal:");
     ESP_LOGCONFIG(TAG, "  home_id='%s'", this->home_id_.c_str());
     ESP_LOGCONFIG(TAG, "  device_label='%s'", this->device_label_.c_str());
   }
 
+  // Called by wifi_component via the same hook the built-in captive_portal
+  // uses — see base.yaml's on_boot action that calls this via an
+  // interval once AP flips up. We also auto-start in loop().
+  void on_ap_up() {
+    this->enable_loop();  // start pumping DNS + letting clients hit us
+  }
+
   const std::string &get_home_id() const { return this->home_id_; }
   const std::string &get_device_label() const { return this->device_label_; }
 
-  // Active only while the AP is up. During normal STA operation the shared
-  // web_server_base is used by other components (e.g. OTA), so we must
-  // not intercept their requests.
   bool canHandle(AsyncWebServerRequest *request) const override {
-    return wifi::global_wifi_component != nullptr &&
-           wifi::global_wifi_component->is_ap_active();
+    bool ap = wifi::global_wifi_component != nullptr &&
+              wifi::global_wifi_component->is_ap_active();
+    ESP_LOGI(TAG, "canHandle url=%s method=%d ap=%d",
+             request->url().c_str(), (int) request->method(), (int) ap);
+    return ap;
   }
 
   void handleRequest(AsyncWebServerRequest *req) override {
     const char *url = req->url().c_str();
+    ESP_LOGI(TAG, "Request url=%s method=%d", url, (int) req->method());
     if (std::strcmp(url, "/scan.json") == 0) {
       this->handle_scan_(req);
       return;
@@ -117,15 +147,20 @@ class ProvisionPortal : public AsyncWebHandler, public Component {
     this->home_id_ = home_id;
     this->device_label_ = label;
 
-    // Defer wifi save so NVS writes happen on the main loop thread.
-    this->defer([ssid, psk]() {
-      wifi::global_wifi_component->save_wifi_sta(ssid.c_str(), psk.c_str());
-    });
-
     req->send(200, "text/html",
               "<!DOCTYPE html><html><body style='font-family:sans-serif;text-align:center;padding:40px'>"
-              "<h2>Saved</h2><p>Device is rebooting and connecting to WiFi.</p>"
+              "<h2>Saved</h2><p>Rebooting and connecting to WiFi.</p>"
               "<p>You can close this page.</p></body></html>");
+
+    // save_wifi_sta() alone only exits cooldown; in AP mode with no
+    // compiled-in STA we must reboot so wifi_component picks up the
+    // NVS-loaded creds in start() and attempts STA. Defer both the NVS
+    // write and the reboot so the HTTP response flushes first.
+    this->defer([ssid, psk]() {
+      wifi::global_wifi_component->save_wifi_sta(ssid.c_str(), psk.c_str());
+      App.scheduler.set_timeout(nullptr, "provision-reboot", 1500,
+                                []() { App.safe_reboot(); });
+    });
   }
 
   void serve_form_(AsyncWebServerRequest *req) {
@@ -170,6 +205,9 @@ class ProvisionPortal : public AsyncWebHandler, public Component {
   ESPPreferenceObject pref_;
   std::string home_id_;
   std::string device_label_;
+#ifdef USE_ESP32
+  std::unique_ptr<DNSServer> dns_server_;
+#endif
 };
 
 }  // namespace provision_portal

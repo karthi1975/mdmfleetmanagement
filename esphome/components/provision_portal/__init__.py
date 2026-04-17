@@ -14,7 +14,15 @@ import esphome.config_validation as cv
 from esphome.const import CONF_ID
 
 DEPENDENCIES = ["wifi"]
-AUTO_LOAD = ["web_server_base"]
+
+
+def AUTO_LOAD() -> list[str]:
+    from esphome.core import CORE
+
+    autoload = ["web_server_base"]
+    if CORE.is_esp32:
+        autoload.append("socket")
+    return autoload
 
 provision_portal_ns = cg.esphome_ns.namespace("provision_portal")
 ProvisionPortal = provision_portal_ns.class_("ProvisionPortal", cg.Component)

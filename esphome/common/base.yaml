@@ -101,7 +101,7 @@ wifi:
   reboot_timeout: 0s
   power_save_mode: none
   ap:
-    ssid: "${device_name}-fallback"
+    ssid: "${device_name}-onboard"
     password: !secret ap_password
     # ap_timeout is the time STA retries BEFORE enabling the fallback AP.
     # 30s: fail fast so the installer doesn't wait forever at a new site.
@@ -110,7 +110,9 @@ wifi:
 # Serves a simple page at http://192.168.4.1/ while the device is
 # running as an AP. The custom form collects WiFi creds + home_id +
 # device label and persists them to NVS at a stable hash so values
-# survive OTAs (see esphome/components/provision_portal/).
+# survive OTAs (see esphome/components/provision_portal/). The
+# component also ships a wildcard DNS server so phones auto-pop
+# the sign-in browser on connect.
 provision_portal:
   id: provision
 
