@@ -1,12 +1,20 @@
 """Auth dependencies + login endpoint (SRP).
 
-get_current_user — extracts user from JWT Bearer token.
-require_role — factory that returns a dependency for role-based access.
-These are FastAPI Depends — injected into route handlers (DIP).
+Tokens are accepted either as Bearer headers (used by the dashboard's
+fetch calls) or as a secure `mdm_session` cookie (used for SSO from
+/grafana/ via nginx auth_request).
+
+get_current_user  — extracts user from JWT (header OR cookie).
+require_role      — factory returning a dependency for role-based access.
+require_auth      — any authenticated user, used by /verify.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.security import (
+    APIKeyCookie,
+    HTTPAuthorizationCredentials,
+    HTTPBearer,
+)
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +30,12 @@ from fleet_server.services.auth import (
 )
 
 router = APIRouter()
-security = HTTPBearer(auto_error=False)
+
+COOKIE_NAME = "mdm_session"
+COOKIE_MAX_AGE = 60 * 60 * 24  # 24h, matches JWT exp
+
+_bearer = HTTPBearer(auto_error=False)
+_cookie = APIKeyCookie(name=COOKIE_NAME, auto_error=False)
 
 
 # ─── Schemas ────────────────────────────────────────────────────────
@@ -58,15 +71,26 @@ class UserResponse(BaseModel):
 
 # ─── Dependencies ───────────────────────────────────────────────────
 
+
+def _extract_token(
+    bearer: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    cookie: str | None = Depends(_cookie),
+) -> str | None:
+    """Prefer Authorization: Bearer, fall back to mdm_session cookie."""
+    if bearer and bearer.credentials:
+        return bearer.credentials
+    return cookie
+
+
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    token: str | None = Depends(_extract_token),
     db: AsyncSession = Depends(get_db),
 ) -> User | None:
-    """Extract user from JWT Bearer token. Returns None if no token (public access)."""
-    if not credentials:
+    """Extract user from JWT. Returns None if no token (public access)."""
+    if not token:
         return None
 
-    payload = decode_token(credentials.credentials)
+    payload = decode_token(token)
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -85,23 +109,32 @@ async def get_current_user(
     return user
 
 
-def require_role(*roles: str):
-    """Factory that returns a dependency requiring specific role(s).
+async def require_auth(user: User | None = Depends(get_current_user)) -> User:
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+    return user
 
-    Usage: Depends(require_role("admin", "operator"))
+
+def require_role(*roles: str):
+    """Dependency factory — user must have one of the given roles.
+
     Follows OCP — add new roles without changing existing guards.
     """
+
     async def _guard(
-        credentials: HTTPAuthorizationCredentials | None = Depends(security),
+        token: str | None = Depends(_extract_token),
         db: AsyncSession = Depends(get_db),
     ) -> User:
-        if not credentials:
+        if not token:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authentication required",
             )
 
-        payload = decode_token(credentials.credentials)
+        payload = decode_token(token)
         if not payload:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -132,9 +165,23 @@ def require_role(*roles: str):
 
 # ─── Endpoints ──────────────────────────────────────────────────────
 
+
+def _set_session_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        max_age=COOKIE_MAX_AGE,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        path="/",
+    )
+
+
 @router.post("/login", response_model=TokenResponse)
 async def login(
     payload: LoginRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(User).where(User.email == payload.email))
@@ -153,14 +200,30 @@ async def login(
         )
 
     token = create_access_token(user.id, user.role)
+    _set_session_cookie(response, token)
 
-    # Audit
     audit = AuditService(db, user_id=user.id)
     await audit.log("login", "user", {"email": user.email})
 
-    return TokenResponse(
-        access_token=token, role=user.role, user_id=user.id,
-    )
+    return TokenResponse(access_token=token, role=user.role, user_id=user.id)
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    response.delete_cookie(COOKIE_NAME, path="/")
+    return {"ok": True}
+
+
+@router.get("/verify")
+async def verify(response: Response, user: User = Depends(require_auth)):
+    """nginx auth_request target. On success, returns X-Auth-* response
+    headers that nginx propagates into upstream requests (e.g. as
+    X-WEBAUTH-USER for Grafana's auth.proxy mode).
+    """
+    response.headers["X-Auth-User"] = user.email
+    response.headers["X-Auth-Role"] = user.role
+    response.headers["X-Auth-Id"] = user.id
+    return {"user": user.id, "role": user.role}
 
 
 @router.post("/users", response_model=UserResponse, status_code=201)

@@ -102,6 +102,22 @@ services:
       # Used by provisioning/datasources/postgres.yml — keeps Grafana in
       # sync when the postgres password is rotated.
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fleet_secret}
+      # SSO via nginx auth_request → fleet-api /api/auth/verify.
+      # nginx sets X-WEBAUTH-USER from the verify response; Grafana
+      # auto-creates/syncs the user. Login form disabled so the only
+      # way in is through the fleet-api session cookie.
+      GF_AUTH_PROXY_ENABLED: "true"
+      GF_AUTH_PROXY_HEADER_NAME: "X-WEBAUTH-USER"
+      GF_AUTH_PROXY_HEADER_PROPERTY: "username"
+      GF_AUTH_PROXY_AUTO_SIGN_UP: "true"
+      GF_AUTH_PROXY_SYNC_TTL: "60"
+      GF_AUTH_PROXY_HEADERS: "Email:X-WEBAUTH-EMAIL Role:X-WEBAUTH-ROLE"
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_AUTH_BASIC_ENABLED: "true"
+      GF_USERS_AUTO_ASSIGN_ORG_ROLE: "Admin"
+      # Allow the Fleet Console dashboard to iframe the /admin/ UI.
+      GF_PANELS_DISABLE_SANITIZE_HTML: "true"
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
       GF_AUTH_LOGIN_COOKIE_NAME: "smarthome_session"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/etc/grafana/provisioning/dashboards/json/fleet-overview.json"
       GF_USERS_DEFAULT_THEME: "light"
