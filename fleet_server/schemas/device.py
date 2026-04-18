@@ -22,10 +22,10 @@ class DeviceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     device_id: str
-    mac: str
+    mac: str | None
     display_name: str | None
     custom_id: str | None
-    firmware_version: str
+    firmware_version: str | None
     role: str
     status: str
     last_seen: datetime | None
