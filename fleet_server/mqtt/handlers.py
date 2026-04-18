@@ -48,8 +48,25 @@ async def handle_heartbeat(device_name: str, raw_payload: str, db: AsyncSession)
     await db.commit()
 
     if row is None:
-        logger.warning("Heartbeat from unknown device: %s", device_name)
-        return False
+        # Unknown device — either a fresh install whose register publish
+        # raced the heartbeat, or whose register INSERT rolled back (e.g.
+        # mac-unique conflict with a retired row). Create a minimal row
+        # so we don't drop telemetry; the next on_boot register will
+        # fill in home_id + display_name + custom_id.
+        logger.info("Auto-registering unknown device from heartbeat: %s", device_name)
+        db.add(
+            Device(
+                device_id=device_name,
+                role="sensor",
+                status="alive",
+                last_seen=datetime.now(timezone.utc),
+                rssi=data.get("rssi"),
+                heap=data.get("heap"),
+                uptime=uptime,
+            )
+        )
+        await db.commit()
+        return True
 
     # Auto-promote in-flight OTA when device reboots cleanly: a fresh-boot
     # heartbeat (low uptime) following an event in flashing/downloading is
