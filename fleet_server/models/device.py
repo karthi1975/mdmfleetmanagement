@@ -12,6 +12,7 @@ class Device(Base):
     device_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     mac: Mapped[str] = mapped_column(String(17), unique=True, nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    custom_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     firmware_version: Mapped[str] = mapped_column(String(32), nullable=True)
     target_firmware_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
     device_type: Mapped[str] = mapped_column(String(32), default="room_sensor")

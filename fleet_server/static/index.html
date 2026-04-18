@@ -108,7 +108,7 @@
       <div class="card">
         <h2>Devices <span id="devCount" class="count"></span></h2>
         <table id="devTable"><thead>
-          <tr><th>Device</th><th>Name</th><th>Home</th><th>Role</th><th>Version</th><th>Status</th><th>Last seen</th></tr>
+          <tr><th>Device</th><th>Custom ID</th><th>Name</th><th>Home</th><th>Role</th><th>Version</th><th>Status</th><th>Last seen</th></tr>
         </thead><tbody></tbody></table>
       </div>
 
@@ -311,6 +311,7 @@ async function loadDevices() {
   tbody.innerHTML = devices.map(d => `
     <tr>
       <td>${d.device_id}<br><small style="color:var(--muted)">${d.mac || ''}</small></td>
+      <td>${d.custom_id || '—'}</td>
       <td>${d.display_name || '—'}</td>
       <td>${d.home_id || '—'}</td>
       <td>${d.role || '—'}</td>

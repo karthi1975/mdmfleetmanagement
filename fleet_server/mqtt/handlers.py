@@ -103,6 +103,7 @@ async def handle_registration(device_name: str, raw_payload: str, db: AsyncSessi
     role = data.get("role", "sensor")
     home_id = (data.get("home_id") or "").strip() or None
     display_name = (data.get("label") or "").strip() or None
+    custom_id = (data.get("custom_id") or "").strip() or None
     now = datetime.now(timezone.utc)
 
     # FK requires the home row to exist before the device references it.
@@ -133,11 +134,13 @@ async def handle_registration(device_name: str, raw_payload: str, db: AsyncSessi
             existing.home_id = home_id
         if display_name is not None:
             existing.display_name = display_name
+        if custom_id is not None:
+            existing.custom_id = custom_id
         await db.commit()
         await db.refresh(existing)
         logger.info(
-            "Device re-registered: %s (v%s, home=%s, label=%s)",
-            device_name, version, home_id, display_name,
+            "Device re-registered: %s (v%s, home=%s, label=%s, custom_id=%s)",
+            device_name, version, home_id, display_name, custom_id,
         )
         return existing
 
@@ -150,13 +153,14 @@ async def handle_registration(device_name: str, raw_payload: str, db: AsyncSessi
         last_seen=now,
         home_id=home_id,
         display_name=display_name,
+        custom_id=custom_id,
     )
     db.add(device)
     await db.commit()
     await db.refresh(device)
     logger.info(
-        "New device registered: %s (v%s, role=%s, home=%s, label=%s)",
-        device_name, version, role, home_id, display_name,
+        "New device registered: %s (v%s, role=%s, home=%s, label=%s, custom_id=%s)",
+        device_name, version, role, home_id, display_name, custom_id,
     )
     return device
 

@@ -13,6 +13,11 @@ external_components:
 
 esphome:
   name: ${device_name}
+  # Suffix ${device_name} with the last 6 hex digits of the WiFi MAC at
+  # runtime, so each physical chip registers as its own device_id
+  # (e.g. esp32-test-fa48d0). Without this every board flashed from the
+  # same image collides on the same device_id row.
+  name_add_mac_suffix: true
   includes: []
   on_boot:
     priority: -100
@@ -22,7 +27,7 @@ esphome:
             lambda: 'return id(mqtt_client).is_connected();'
       - delay: 1s
       - mqtt.publish:
-          topic: "fleet/${device_name}/register"
+          topic: !lambda 'return "fleet/" + App.get_name() + "/register";'
           qos: 1
           retain: true
           payload: !lambda |-
@@ -31,7 +36,8 @@ esphome:
                    "\",\"version\":\"${firmware_version}\"" +
                    ",\"role\":\"${device_role}\"" +
                    ",\"home_id\":\"" + pp.get_home_id() + "\"" +
-                   ",\"label\":\"" + pp.get_device_label() + "\"}";
+                   ",\"label\":\"" + pp.get_device_label() + "\"" +
+                   ",\"custom_id\":\"" + pp.get_custom_id() + "\"}";
 
 mqtt:
   id: mqtt_client
@@ -40,19 +46,17 @@ mqtt:
   username: !secret mqtt_username
   password: !secret mqtt_password
   certificate_authority: !secret mqtt_ca_certificate
-  topic_prefix: "fleet/${device_name}"
-  birth_message:
-    topic: "fleet/${device_name}/status"
-    payload: "online"
-  will_message:
-    topic: "fleet/${device_name}/status"
-    payload: "offline"
+  # No topic_prefix / birth / will here — MQTT_MESSAGE_SCHEMA doesn't
+  # accept lambdas, and compile-time topics would collide across chips
+  # that share the same compiled device_name. Every publish below uses
+  # a lambda built from App.get_name() (mac-suffixed), and fleet-api
+  # tracks alive/dead via the 30s heartbeat instead of birth/will.
 
 interval:
   - interval: 30s
     then:
       - mqtt.publish:
-          topic: "fleet/${device_name}/heartbeat"
+          topic: !lambda 'return "fleet/" + App.get_name() + "/heartbeat";'
           payload: !lambda |-
             int rssi = 0;
             if (!std::isnan(id(wifi_rssi).state)) {

@@ -24,6 +24,7 @@ class DeviceResponse(BaseModel):
     device_id: str
     mac: str
     display_name: str | None
+    custom_id: str | None
     firmware_version: str
     role: str
     status: str

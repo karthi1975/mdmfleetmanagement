@@ -32,6 +32,7 @@ static constexpr uint32_t PREF_HASH = 0x484F4D45UL;  // "HOME"
 struct ProvisionSettings {
   char home_id[65];
   char device_label[65];
+  char custom_id[65];
 } PACKED;
 
 class ProvisionPortal : public AsyncWebHandler, public Component {
@@ -46,8 +47,10 @@ class ProvisionPortal : public AsyncWebHandler, public Component {
     if (this->pref_.load(&s)) {
       this->home_id_ = s.home_id;
       this->device_label_ = s.device_label;
-      ESP_LOGI(TAG, "Loaded NVS: home_id='%s' label='%s'",
-               this->home_id_.c_str(), this->device_label_.c_str());
+      this->custom_id_ = s.custom_id;
+      ESP_LOGI(TAG, "Loaded NVS: home_id='%s' label='%s' custom_id='%s'",
+               this->home_id_.c_str(), this->device_label_.c_str(),
+               this->custom_id_.c_str());
     } else {
       ESP_LOGI(TAG, "No stored provisioning settings yet");
     }
@@ -90,6 +93,7 @@ class ProvisionPortal : public AsyncWebHandler, public Component {
 
   const std::string &get_home_id() const { return this->home_id_; }
   const std::string &get_device_label() const { return this->device_label_; }
+  const std::string &get_custom_id() const { return this->custom_id_; }
 
   bool canHandle(AsyncWebServerRequest *request) const override {
     bool ap = wifi::global_wifi_component != nullptr &&
@@ -134,18 +138,21 @@ class ProvisionPortal : public AsyncWebHandler, public Component {
     std::string psk = req->arg("psk").c_str();
     std::string home_id = req->arg("home_id").c_str();
     std::string label = req->arg("label").c_str();
+    std::string custom_id = req->arg("custom_id").c_str();
 
-    ESP_LOGI(TAG, "Saving ssid='%s' home_id='%s' label='%s'",
-             ssid.c_str(), home_id.c_str(), label.c_str());
+    ESP_LOGI(TAG, "Saving ssid='%s' home_id='%s' label='%s' custom_id='%s'",
+             ssid.c_str(), home_id.c_str(), label.c_str(), custom_id.c_str());
 
     ProvisionSettings s{};
     std::strncpy(s.home_id, home_id.c_str(), sizeof(s.home_id) - 1);
     std::strncpy(s.device_label, label.c_str(), sizeof(s.device_label) - 1);
+    std::strncpy(s.custom_id, custom_id.c_str(), sizeof(s.custom_id) - 1);
     this->pref_.save(&s);
     global_preferences->sync();
 
     this->home_id_ = home_id;
     this->device_label_ = label;
+    this->custom_id_ = custom_id;
 
     req->send(200, "text/html",
               "<!DOCTYPE html><html><body style='font-family:sans-serif;text-align:center;padding:40px'>"
@@ -192,6 +199,11 @@ class ProvisionPortal : public AsyncWebHandler, public Component {
             "<input name=home_id required placeholder='e.g. home-001' value='";
     html += this->home_id_;
     html += "'><div class=hint>Same value for every device in this home.</div>"
+            "<label>Device ID</label>"
+            "<input name=custom_id required placeholder='e.g. karthi-garage-01' value='";
+    html += this->custom_id_;
+    html += "'><div class=hint>Short unique code for this device. Example: "
+            "<code>homeid-room-01</code>.</div>"
             "<label>Device name</label>"
             "<input name=label required placeholder='e.g. Kitchen Sensor' value='";
     html += this->device_label_;
@@ -205,6 +217,7 @@ class ProvisionPortal : public AsyncWebHandler, public Component {
   ESPPreferenceObject pref_;
   std::string home_id_;
   std::string device_label_;
+  std::string custom_id_;
 #ifdef USE_ESP32
   std::unique_ptr<DNSServer> dns_server_;
 #endif
