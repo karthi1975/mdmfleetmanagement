@@ -29,7 +29,11 @@ esphome:
       - mqtt.publish:
           topic: !lambda 'return "fleet/" + App.get_name() + "/register";'
           qos: 1
-          retain: true
+          # retain: false — a retained register replays to fleet-api on
+          # every restart and silently overwrites any admin edits to
+          # home_id / display_name / custom_id. The register fires on
+          # every boot anyway, so the broker doesn't need to cache it.
+          retain: false
           payload: !lambda |-
             auto &pp = *id(provision);
             return std::string("{\"mac\":\"") + get_mac_address_pretty() +
