@@ -26,7 +26,7 @@ class DeviceResponse(BaseModel):
     display_name: str | None
     custom_id: str | None
     firmware_version: str | None
-    role: str
+    role: str | None
     status: str
     last_seen: datetime | None
     home_id: str | None
@@ -35,3 +35,11 @@ class DeviceResponse(BaseModel):
     uptime: int | None
     created_at: datetime
     updated_at: datetime
+
+
+class DeviceListResponse(BaseModel):
+    """Paginated, filtered response for /api/devices/."""
+    items: list[DeviceResponse]
+    total: int
+    limit: int
+    offset: int

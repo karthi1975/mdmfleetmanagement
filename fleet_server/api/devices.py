@@ -5,7 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from fleet_server.database import get_db
 from fleet_server.repositories.device import DeviceRepository
-from fleet_server.schemas.device import DeviceCreate, DeviceResponse, DeviceUpdate
+from fleet_server.schemas.device import (
+    DeviceCreate,
+    DeviceListResponse,
+    DeviceResponse,
+    DeviceUpdate,
+)
 from fleet_server.services.audit import AuditService
 
 router = APIRouter()
@@ -19,18 +24,39 @@ def get_audit(db: AsyncSession = Depends(get_db)) -> AuditService:
     return AuditService(db)
 
 
-@router.get("/", response_model=list[DeviceResponse])
+@router.get("/", response_model=DeviceListResponse)
 async def list_devices(
     status: str | None = None,
     home_id: str | None = None,
+    firmware_version: str | None = None,
     role: str | None = None,
+    search: str | None = None,
+    sort: str = "-last_seen",
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=500),
     repo: DeviceRepository = Depends(get_repo),
 ):
-    return await repo.get_filtered(
-        status=status, home_id=home_id, role=role, skip=skip, limit=limit
+    items, total = await repo.get_filtered_paginated(
+        status=status,
+        home_id=home_id,
+        firmware_version=firmware_version,
+        role=role,
+        search=search,
+        sort=sort,
+        skip=skip,
+        limit=limit,
     )
+    return DeviceListResponse(items=items, total=total, limit=limit, offset=skip)
+
+
+# Distinct-value helper for filter dropdowns (home_id, firmware_version, ...).
+# Defined before the /{device_id} catch-all so the path matches first.
+@router.get("/facets/{column}", response_model=list[str])
+async def list_facet(
+    column: str,
+    repo: DeviceRepository = Depends(get_repo),
+):
+    return await repo.distinct_values(column)
 
 
 @router.get("/{device_id}", response_model=DeviceResponse)

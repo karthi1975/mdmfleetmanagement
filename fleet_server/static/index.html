@@ -72,6 +72,9 @@
     .ota-row .primary-text { font-size: 0.9rem; color: var(--text); }
     .ota-row .sub-text { font-size: 0.73rem; color: var(--muted); margin-top: 0.1rem; font-family: ui-monospace, monospace; }
     .ota-empty { padding: 0.8rem; text-align: center; color: var(--muted); font-size: 0.85rem; }
+    .pager { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.5rem; }
+    .pager-info { color: var(--muted); font-size: 0.8rem; flex: 1; text-align: center; }
+    .pager button:disabled { opacity: 0.4; cursor: not-allowed; }
     .status-pill {
       display: inline-block; padding: 0.1rem 0.5rem; border-radius: 10px;
       font-size: 0.75rem; font-weight: 600;
@@ -126,6 +129,11 @@
         <table id="devTable"><thead>
           <tr><th>Device</th><th>Custom ID</th><th>Name</th><th>Home</th><th>Role</th><th>Version</th><th>Status</th><th>Last seen</th></tr>
         </thead><tbody></tbody></table>
+        <div class="pager">
+          <button type="button" id="devPrev" class="small">← Prev</button>
+          <span id="devPageInfo" class="pager-info"></span>
+          <button type="button" id="devNext" class="small">Next →</button>
+        </div>
       </div>
 
       <div class="card">
@@ -196,6 +204,11 @@
             <button type="button" id="otaClear" class="small">Clear</button>
           </div>
           <div class="checklist" id="otaDevices"></div>
+          <div class="pager">
+            <button type="button" id="otaPrev" class="small">← Prev</button>
+            <span id="otaPageInfo" class="pager-info"></span>
+            <button type="button" id="otaNext" class="small">Next →</button>
+          </div>
         </div>
       </div>
       <button id="otaBtn" class="primary">Start OTA rollout</button>
@@ -330,46 +343,28 @@ function pill(status) {
   return `<span class="status-pill status-${status}">${status}</span>`;
 }
 
-// OTA picker state survives across refreshes so the user's search /
-// filter / selection doesn't reset every 10 s.
+// Phase-2 picker: filters + pagination live on the server, so the
+// client only keeps UI state (selected IDs, current filters, current
+// page). Every filter change refetches one page of matches.
+const tableState = { page: 0, limit: 50, total: 0 };
+
 const otaState = {
-  devices: [],
   selected: new Set(),
   search: '',
   home: '',
   version: '',
   aliveOnly: true,
+  page: 0,
+  limit: 50,
+  total: 0,
+  items: [],
+  facets: { homes: [], versions: [] },
+  searchDebounce: null,
 };
 
 function renderOtaPicker() {
-  const q = otaState.search.trim().toLowerCase();
-  const filtered = otaState.devices.filter(d => {
-    if (otaState.aliveOnly && d.status !== 'alive') return false;
-    if (otaState.home && d.home_id !== otaState.home) return false;
-    if (otaState.version && d.firmware_version !== otaState.version) return false;
-    if (q) {
-      const hay = `${d.device_id} ${d.custom_id || ''} ${d.display_name || ''} ${d.home_id || ''}`.toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
-  });
-
-  // Populate home + version dropdowns from full device list (not filtered),
-  // so selecting a filter doesn't hide its own option. Preserve current values.
-  const homeSel = $('otaHome');
-  const homes = [...new Set(otaState.devices.map(d => d.home_id).filter(Boolean))].sort();
-  homeSel.innerHTML = '<option value="">All homes</option>' +
-    homes.map(h => `<option value="${h}" ${h === otaState.home ? 'selected' : ''}>${h}</option>`).join('');
-
-  const verSel = $('otaVer');
-  const versions = [...new Set(otaState.devices.map(d => d.firmware_version).filter(Boolean))]
-    .sort().reverse();
-  verSel.innerHTML = '<option value="">All versions</option>' +
-    versions.map(v => `<option value="${v}" ${v === otaState.version ? 'selected' : ''}>${v}</option>`).join('');
-
-  // Group filtered devices by home for visual grouping.
   const byHome = new Map();
-  for (const d of filtered) {
+  for (const d of otaState.items) {
     const key = d.home_id || '— no home —';
     if (!byHome.has(key)) byHome.set(key, []);
     byHome.get(key).push(d);
@@ -397,27 +392,87 @@ function renderOtaPicker() {
   $('otaDevices').innerHTML = html.join('') ||
     '<div class="ota-empty">No devices match these filters.</div>';
 
-  const totalSel = otaState.selected.size;
-  const visSel = filtered.filter(d => otaState.selected.has(d.device_id)).length;
+  // Facet dropdowns come from the cheap /facets/ endpoint, so they
+  // show every home / version regardless of what the current page holds.
+  const homeSel = $('otaHome');
+  homeSel.innerHTML = '<option value="">All homes</option>' +
+    otaState.facets.homes.map(h => `<option value="${h}" ${h === otaState.home ? 'selected' : ''}>${h}</option>`).join('');
+  const verSel = $('otaVer');
+  verSel.innerHTML = '<option value="">All versions</option>' +
+    otaState.facets.versions.map(v => `<option value="${v}" ${v === otaState.version ? 'selected' : ''}>${v}</option>`).join('');
+
+  const totalPages = Math.max(1, Math.ceil(otaState.total / otaState.limit));
+  const curPage = otaState.page + 1;
+  const first = otaState.total === 0 ? 0 : otaState.page * otaState.limit + 1;
+  const last = Math.min(otaState.total, (otaState.page + 1) * otaState.limit);
   $('otaCounter').textContent =
-    `${totalSel} selected · ${filtered.length} shown · ${otaState.devices.length} total` +
-    (totalSel !== visSel ? ` (${totalSel - visSel} hidden by filter)` : '');
+    `${otaState.selected.size} selected · ${first}–${last} of ${otaState.total}`;
+  $('otaPageInfo').textContent = otaState.total === 0
+    ? 'No matches' : `Page ${curPage} / ${totalPages}`;
+  $('otaPrev').disabled = otaState.page <= 0;
+  $('otaNext').disabled = otaState.page >= totalPages - 1;
+}
+
+async function loadOtaPicker() {
+  const params = new URLSearchParams({
+    skip: String(otaState.page * otaState.limit),
+    limit: String(otaState.limit),
+    sort: '-last_seen',
+  });
+  if (otaState.search.trim()) params.set('search', otaState.search.trim());
+  if (otaState.home) params.set('home_id', otaState.home);
+  if (otaState.version) params.set('firmware_version', otaState.version);
+  if (otaState.aliveOnly) params.set('status', 'alive');
+  const r = await api(`/api/devices/?${params.toString()}`);
+  otaState.items = r.items;
+  otaState.total = r.total;
+  renderOtaPicker();
+}
+
+async function loadOtaFacets() {
+  try {
+    const [homes, versions] = await Promise.all([
+      api('/api/devices/facets/home_id'),
+      api('/api/devices/facets/firmware_version'),
+    ]);
+    otaState.facets.homes = homes;
+    otaState.facets.versions = [...versions].reverse(); // newest first
+  } catch (err) {
+    console.error('facets fetch failed', err);
+  }
 }
 
 function setupOtaPicker() {
-  $('otaSearch').addEventListener('input', e => { otaState.search = e.target.value; renderOtaPicker(); });
-  $('otaHome').addEventListener('change', e => { otaState.home = e.target.value; renderOtaPicker(); });
-  $('otaVer').addEventListener('change', e => { otaState.version = e.target.value; renderOtaPicker(); });
-  $('otaAlive').addEventListener('change', e => { otaState.aliveOnly = e.target.checked; renderOtaPicker(); });
+  $('otaSearch').addEventListener('input', e => {
+    otaState.search = e.target.value;
+    clearTimeout(otaState.searchDebounce);
+    otaState.searchDebounce = setTimeout(() => {
+      otaState.page = 0;
+      loadOtaPicker();
+    }, 300);
+  });
+  $('otaHome').addEventListener('change', e => {
+    otaState.home = e.target.value; otaState.page = 0; loadOtaPicker();
+  });
+  $('otaVer').addEventListener('change', e => {
+    otaState.version = e.target.value; otaState.page = 0; loadOtaPicker();
+  });
+  $('otaAlive').addEventListener('change', e => {
+    otaState.aliveOnly = e.target.checked; otaState.page = 0; loadOtaPicker();
+  });
   $('otaSelectAll').addEventListener('click', () => {
-    document.querySelectorAll('#otaDevices input[type="checkbox"]').forEach(el => {
-      otaState.selected.add(el.value);
-    });
+    for (const d of otaState.items) otaState.selected.add(d.device_id);
     renderOtaPicker();
   });
   $('otaClear').addEventListener('click', () => {
-    otaState.selected.clear();
-    renderOtaPicker();
+    otaState.selected.clear(); renderOtaPicker();
+  });
+  $('otaPrev').addEventListener('click', () => {
+    if (otaState.page > 0) { otaState.page--; loadOtaPicker(); }
+  });
+  $('otaNext').addEventListener('click', () => {
+    const maxPage = Math.max(0, Math.ceil(otaState.total / otaState.limit) - 1);
+    if (otaState.page < maxPage) { otaState.page++; loadOtaPicker(); }
   });
   $('otaDevices').addEventListener('change', e => {
     if (e.target.type !== 'checkbox') return;
@@ -425,11 +480,29 @@ function setupOtaPicker() {
     else otaState.selected.delete(e.target.value);
     renderOtaPicker();
   });
+
+  // Device-table pager
+  $('devPrev').addEventListener('click', () => {
+    if (tableState.page > 0) { tableState.page--; loadDeviceTable(); }
+  });
+  $('devNext').addEventListener('click', () => {
+    const maxPage = Math.max(0, Math.ceil(tableState.total / tableState.limit) - 1);
+    if (tableState.page < maxPage) { tableState.page++; loadDeviceTable(); }
+  });
 }
 
-async function loadDevices() {
-  const devices = await api('/api/devices/');
-  $('devCount').textContent = `(${devices.length})`;
+async function loadDeviceTable() {
+  const params = new URLSearchParams({
+    skip: String(tableState.page * tableState.limit),
+    limit: String(tableState.limit),
+    sort: '-last_seen',
+  });
+  const r = await api(`/api/devices/?${params.toString()}`);
+  tableState.total = r.total;
+  const devices = r.items;
+  const first = r.total === 0 ? 0 : tableState.page * tableState.limit + 1;
+  const last = Math.min(r.total, (tableState.page + 1) * tableState.limit);
+  $('devCount').textContent = r.total === 0 ? '(0)' : `(${first}–${last} of ${r.total})`;
   const tbody = $('devTable').querySelector('tbody');
   tbody.innerHTML = devices.map(d => `
     <tr>
@@ -442,12 +515,17 @@ async function loadDevices() {
       <td>${pill(d.status)}</td>
       <td>${fmtDate(d.last_seen)}</td>
     </tr>`).join('');
+  const totalPages = Math.max(1, Math.ceil(r.total / tableState.limit));
+  $('devPageInfo').textContent = r.total === 0
+    ? 'No devices' : `Page ${tableState.page + 1} / ${totalPages}`;
+  $('devPrev').disabled = tableState.page <= 0;
+  $('devNext').disabled = tableState.page >= totalPages - 1;
+}
 
-  otaState.devices = devices;
-  // Prune selection of devices that have disappeared (deleted / renamed).
-  const ids = new Set(devices.map(d => d.device_id));
-  for (const id of [...otaState.selected]) if (!ids.has(id)) otaState.selected.delete(id);
-  renderOtaPicker();
+async function loadDevices() {
+  // Kept under the old name so existing callers (refresh, setInterval)
+  // continue to work; now fans out into the three server-side loads.
+  await Promise.all([loadDeviceTable(), loadOtaPicker(), loadOtaFacets()]);
 }
 
 async function loadFirmware() {
