@@ -75,6 +75,92 @@ class OTAService:
         )
         return events
 
+    async def preview_rollout(
+        self,
+        target_version: str,
+        strategy: str = "full",
+        canary_count: int = 2,
+        target_devices: list[str] | None = None,
+        target_community: str | None = None,
+    ) -> dict:
+        """Dry-run: select devices the same way start_rollout would, but
+        write nothing, publish nothing. Returns counts + breakdowns the
+        admin can eyeball before committing the real rollout."""
+        firmware = await self._firmware.get_by_version(target_version)
+        if not firmware:
+            raise ValueError(f"Firmware version {target_version} not found")
+
+        devices = await self._select_devices(
+            strategy, canary_count, target_devices, target_community, target_version
+        )
+        by_version: dict[str, int] = {}
+        by_home: dict[str, int] = {}
+        by_status: dict[str, int] = {}
+        for d in devices:
+            v = d.firmware_version or "unknown"
+            h = d.home_id or "(unassigned)"
+            s = d.status or "unknown"
+            by_version[v] = by_version.get(v, 0) + 1
+            by_home[h] = by_home.get(h, 0) + 1
+            by_status[s] = by_status.get(s, 0) + 1
+        return {
+            "target_version": target_version,
+            "strategy": strategy,
+            "total": len(devices),
+            "by_status": by_status,
+            "by_current_version": by_version,
+            "by_home": by_home,
+            "device_ids": [d.device_id for d in devices],
+        }
+
+    async def get_campaigns(self, limit: int = 20) -> list[dict]:
+        """Group ota_events into "campaigns" by (to_version,
+        1-minute started_at bucket) so the admin sees one row per
+        fleet-wide rollout with aggregated status counts.
+        """
+        from sqlalchemy import case, func
+
+        bucket = func.date_trunc("minute", OTAEvent.started_at)
+        q = (
+            select(
+                OTAEvent.to_version.label("to_version"),
+                bucket.label("bucket"),
+                func.count().label("total"),
+                func.sum(case((OTAEvent.status == "success", 1), else_=0)).label(
+                    "success"
+                ),
+                func.sum(case((OTAEvent.status == "failed", 1), else_=0)).label(
+                    "failed"
+                ),
+                func.sum(
+                    case(
+                        (
+                            OTAEvent.status.in_(
+                                ["pending", "downloading", "flashing"]
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("in_flight"),
+            )
+            .group_by(OTAEvent.to_version, bucket)
+            .order_by(bucket.desc())
+            .limit(limit)
+        )
+        rows = (await self.db.execute(q)).all()
+        return [
+            {
+                "to_version": r.to_version,
+                "started_at": r.bucket,
+                "total": int(r.total),
+                "success": int(r.success or 0),
+                "failed": int(r.failed or 0),
+                "in_flight": int(r.in_flight or 0),
+            }
+            for r in rows
+        ]
+
     async def get_events(self, target_version: str | None = None) -> list[OTAEvent]:
         query = select(OTAEvent).order_by(OTAEvent.started_at.desc())
         if target_version:

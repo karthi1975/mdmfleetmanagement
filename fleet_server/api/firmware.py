@@ -3,9 +3,11 @@
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fleet_server.api.auth import require_role
+from fleet_server.api.auth import get_current_user, require_role
 from fleet_server.database import get_db
+from fleet_server.models.user import User
 from fleet_server.schemas.firmware import FirmwareResponse
+from fleet_server.services.audit import AuditService
 from fleet_server.services.firmware import FirmwareService
 
 router = APIRouter()
@@ -13,6 +15,10 @@ router = APIRouter()
 
 def get_service(db: AsyncSession = Depends(get_db)) -> FirmwareService:
     return FirmwareService(db)
+
+
+def get_audit(db: AsyncSession = Depends(get_db)) -> AuditService:
+    return AuditService(db)
 
 
 @router.post(
@@ -26,6 +32,8 @@ async def upload_firmware(
     release_notes: str = Form(""),
     file: UploadFile = File(...),
     service: FirmwareService = Depends(get_service),
+    audit: AuditService = Depends(get_audit),
+    user: User = Depends(get_current_user),
 ):
     existing = await service.get_by_version(version)
     if existing:
@@ -35,7 +43,14 @@ async def upload_firmware(
     if not content:
         raise HTTPException(status_code=400, detail="Empty file")
 
-    return await service.upload(version, content, release_notes)
+    fw = await service.upload(version, content, release_notes)
+    audit.user_id = user.id if user else None
+    await audit.log(
+        "upload",
+        "firmware",
+        {"version": version, "size_bytes": len(content), "checksum": fw.checksum},
+    )
+    return fw
 
 
 @router.get("/", response_model=list[FirmwareResponse])

@@ -19,8 +19,13 @@ from fleet_server.schemas.device_group import (
     DeviceGroupResponse,
     DeviceGroupUpdate,
 )
+from fleet_server.services.audit import AuditService
 
 router = APIRouter()
+
+
+def _audit(db: AsyncSession, user: User | None) -> AuditService:
+    return AuditService(db, user_id=user.id if user else None)
 
 
 def _to_response(g: DeviceGroup) -> DeviceGroupResponse:
@@ -82,6 +87,11 @@ async def create_group(
         )
     await db.commit()
     await db.refresh(group, ["members"])
+    await _audit(db, user).log(
+        "create",
+        "device_group",
+        {"id": group.id, "name": group.name, "member_count": len(payload.device_ids)},
+    )
     return _to_response(group)
 
 
@@ -94,11 +104,13 @@ async def update_group(
     group_id: int,
     payload: DeviceGroupUpdate,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     group = await db.get(DeviceGroup, group_id)
     if not group:
         raise HTTPException(404, "Group not found")
 
+    changes = payload.model_dump(exclude_unset=True)
     if payload.name is not None:
         group.name = payload.name
     if payload.description is not None:
@@ -123,6 +135,9 @@ async def update_group(
 
     await db.commit()
     await db.refresh(group, ["members"])
+    await _audit(db, user).log(
+        "update", "device_group", {"id": group_id, "changes": changes}
+    )
     return _to_response(group)
 
 
@@ -131,9 +146,17 @@ async def update_group(
     status_code=204,
     dependencies=[Depends(require_role("admin", "operator"))],
 )
-async def delete_group(group_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_group(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     group = await db.get(DeviceGroup, group_id)
     if not group:
         raise HTTPException(404, "Group not found")
+    name = group.name
     await db.delete(group)
     await db.commit()
+    await _audit(db, user).log(
+        "delete", "device_group", {"id": group_id, "name": name}
+    )

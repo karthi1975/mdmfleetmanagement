@@ -234,6 +234,7 @@
         </div>
       </div>
       <div class="rollout-cta">
+        <button type="button" id="otaPreviewBtn" class="small">Preview targets</button>
         <button id="otaBtn" class="primary">Start OTA rollout now</button>
         <div class="rollout-schedule">
           <label for="otaFireAt" style="margin:0">Or schedule for</label>
@@ -241,7 +242,15 @@
           <button type="button" id="otaScheduleBtn" class="small">Schedule</button>
         </div>
       </div>
+      <div id="otaPreview" class="msg" hidden></div>
       <div id="otaMsg" class="msg" hidden></div>
+    </div>
+
+    <div class="card">
+      <h2>Rollout history <span id="campCount" class="count"></span></h2>
+      <table id="campTable"><thead>
+        <tr><th>Started</th><th>Target</th><th>Total</th><th>Success</th><th>Failed</th><th>In-flight</th></tr>
+      </thead><tbody></tbody></table>
     </div>
 
     <div class="card">
@@ -665,6 +674,7 @@ function setupOtaPicker() {
 
   // Schedule-for-later button
   $('otaScheduleBtn').addEventListener('click', scheduleRollout);
+  $('otaPreviewBtn').addEventListener('click', previewRollout);
 
   // Scheduled-rollouts table: cancel button
   $('schedTable').addEventListener('click', async e => {
@@ -686,6 +696,63 @@ function setupOtaPicker() {
     const maxPage = Math.max(0, Math.ceil(tableState.total / tableState.limit) - 1);
     if (tableState.page < maxPage) { tableState.page++; loadDeviceTable(); }
   });
+}
+
+async function previewRollout() {
+  const version = $('otaVersion').value;
+  if (!version) return showOtaMsg('err', 'Pick a target version first');
+  if (otaState.selected.size === 0) return showOtaMsg('err', 'Select at least one device');
+  const payload = {
+    target_version: version,
+    strategy: $('otaStrategy').value,
+    target_devices: [...otaState.selected],
+    canary_count: parseInt($('otaCanary').value, 10) || 2,
+  };
+  try {
+    const p = await api('/api/ota/preview', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const box = $('otaPreview');
+    box.hidden = false;
+    box.className = 'msg ok';
+    const vers = Object.entries(p.by_current_version)
+      .sort((a,b) => b[1]-a[1])
+      .map(([v,n]) => `${v} (${n})`).join(', ') || '—';
+    const homes = Object.entries(p.by_home)
+      .sort((a,b) => b[1]-a[1])
+      .map(([h,n]) => `${h} (${n})`).join(', ') || '—';
+    const statuses = Object.entries(p.by_status)
+      .map(([s,n]) => `${s}: ${n}`).join(', ');
+    box.innerHTML =
+      `<b>Dry-run: ${p.total} devices</b> would receive v${p.target_version} (${p.strategy}).\n` +
+      `  Status breakdown: ${statuses || '—'}\n` +
+      `  Current versions: ${vers}\n` +
+      `  Homes: ${homes}\n` +
+      `  (No writes happened — click "Start OTA rollout now" to commit.)`;
+  } catch (err) {
+    showOtaMsg('err', 'Preview failed: ' + err.message);
+  }
+}
+
+async function loadCampaigns() {
+  let rows = [];
+  try { rows = await api('/api/ota/campaigns?limit=30'); } catch { rows = []; }
+  $('campCount').textContent = `(${rows.length})`;
+  const tbody = $('campTable').querySelector('tbody');
+  tbody.innerHTML = rows.map(c => {
+    const pct = c.total ? Math.round(100 * c.success / c.total) : 0;
+    const successStyle = c.success > 0 ? 'color:var(--ok);font-weight:600' : '';
+    const failStyle = c.failed > 0 ? 'color:var(--err);font-weight:600' : '';
+    const flightStyle = c.in_flight > 0 ? 'color:var(--warn);font-weight:600' : '';
+    return `<tr>
+      <td>${fmtDate(c.started_at)}</td>
+      <td><b>v${c.to_version}</b></td>
+      <td>${c.total}</td>
+      <td style="${successStyle}">${c.success}${c.total ? ` <small style="color:var(--muted)">(${pct}%)</small>` : ''}</td>
+      <td style="${failStyle}">${c.failed}</td>
+      <td style="${flightStyle}">${c.in_flight}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:0.8rem">No rollout history.</td></tr>';
 }
 
 async function scheduleRollout() {
@@ -755,6 +822,7 @@ async function loadDevices() {
     loadOtaFacets(),
     loadDeviceGroups(),
     loadScheduledRollouts(),
+    loadCampaigns(),
   ]);
 }
 

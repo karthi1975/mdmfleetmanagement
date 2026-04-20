@@ -28,3 +28,24 @@ class OTARolloutResponse(BaseModel):
     strategy: str
     total_devices: int
     events: list[OTAEventResponse]
+
+
+class OTARolloutPreview(BaseModel):
+    """Dry-run output: what a rollout would affect, without committing."""
+    target_version: str
+    strategy: str
+    total: int
+    by_status: dict[str, int]
+    by_current_version: dict[str, int]
+    by_home: dict[str, int]
+    device_ids: list[str]
+
+
+class OTACampaign(BaseModel):
+    """A rollout campaign (grouped events) as surfaced on the history panel."""
+    to_version: str
+    started_at: datetime
+    total: int
+    success: int
+    failed: int
+    in_flight: int

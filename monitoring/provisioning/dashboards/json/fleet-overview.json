@@ -115,7 +115,8 @@
           "format": "table",
           "refId": "A"
         }
-      ]
+      ],
+      "id": 2
     },
     {
       "title": "Alive",
@@ -162,7 +163,8 @@
           "format": "table",
           "refId": "A"
         }
-      ]
+      ],
+      "id": 3
     },
     {
       "title": "Dead",
@@ -209,7 +211,8 @@
           "format": "table",
           "refId": "A"
         }
-      ]
+      ],
+      "id": 4
     },
     {
       "title": "Unknown",
@@ -256,7 +259,8 @@
           "format": "table",
           "refId": "A"
         }
-      ]
+      ],
+      "id": 5
     },
     {
       "title": "Status Distribution",
@@ -339,7 +343,8 @@
           "format": "table",
           "refId": "A"
         }
-      ]
+      ],
+      "id": 6
     },
     {
       "title": "Firmware Distribution",
@@ -372,7 +377,8 @@
           "format": "table",
           "refId": "A"
         }
-      ]
+      ],
+      "id": 7
     },
     {
       "title": "Fleet Devices (Req 1: Report & display current fleet code levels)",
@@ -493,7 +499,8 @@
           "format": "table",
           "refId": "A"
         }
-      ]
+      ],
+      "id": 8
     },
     {
       "title": "Health Monitor (Req 2: Monitor fleet for alive/dead conditions)",
@@ -505,7 +512,8 @@
         "y": 43
       },
       "collapsed": false,
-      "panels": []
+      "panels": [],
+      "id": 9
     },
     {
       "title": "Avg RSSI (alive devices)",
@@ -549,7 +557,8 @@
           "format": "table",
           "refId": "A"
         }
-      ]
+      ],
+      "id": 10
     },
     {
       "title": "Avg Free Heap (alive devices)",
@@ -593,7 +602,8 @@
           "format": "table",
           "refId": "A"
         }
-      ]
+      ],
+      "id": 11
     },
     {
       "title": "Dead Devices (Req 2)",
@@ -624,7 +634,8 @@
           "format": "table",
           "refId": "A"
         }
-      ]
+      ],
+      "id": 12
     },
     {
       "title": "Devices Per Home",
@@ -648,7 +659,8 @@
           "format": "table",
           "refId": "A"
         }
-      ]
+      ],
+      "id": 13
     },
     {
       "title": "Community Membership",
@@ -669,7 +681,8 @@
           "format": "table",
           "refId": "A"
         }
-      ]
+      ],
+      "id": 14
     },
     {
       "title": "Recent Audit Log",
@@ -690,7 +703,8 @@
           "format": "table",
           "refId": "A"
         }
-      ]
+      ],
+      "id": 15
     },
     {
       "title": "Central Logging (Req 3)",
@@ -702,7 +716,8 @@
         "y": 56
       },
       "collapsed": false,
-      "panels": []
+      "panels": [],
+      "id": 16
     },
     {
       "title": "Device Logs (Loki)",
@@ -731,7 +746,8 @@
           "expr": "{job=\"fleet\"} |= ``",
           "refId": "A"
         }
-      ]
+      ],
+      "id": 17
     },
     {
       "title": "OTA & Broadcasts (Req 4)",
@@ -743,7 +759,8 @@
         "y": 65
       },
       "collapsed": false,
-      "panels": []
+      "panels": [],
+      "id": 18
     },
     {
       "title": "Firmware Versions Available",
@@ -764,7 +781,8 @@
           "format": "table",
           "refId": "A"
         }
-      ]
+      ],
+      "id": 19
     },
     {
       "title": "Recent OTA Events",
@@ -844,7 +862,8 @@
           "format": "table",
           "refId": "A"
         }
-      ]
+      ],
+      "id": 20
     },
     {
       "title": "Recent Broadcasts (FCM Push)",
@@ -865,7 +884,8 @@
           "format": "table",
           "refId": "A"
         }
-      ]
+      ],
+      "id": 21
     },
     {
       "title": "Broadcast Delivery Stats",
@@ -886,7 +906,135 @@
           "format": "table",
           "refId": "A"
         }
-      ]
+      ],
+      "id": 22
+    },
+    {
+      "id": 23,
+      "type": "row",
+      "title": "Phase 3/4 \u2014 Groups, Scheduled, History",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 79,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 24,
+      "type": "table",
+      "title": "Device Groups",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 80,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PF70FA7EDACA091DA"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT g.id as \"ID\",\n                  g.name as \"Name\",\n                  COALESCE(g.description,'') as \"Description\",\n                  (SELECT count(*) FROM device_group_members m WHERE m.group_id = g.id) as \"Members\",\n                  g.created_by as \"Created by\",\n                  g.updated_at as \"Updated\"\n             FROM device_groups g\n         ORDER BY g.updated_at DESC",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 25,
+      "type": "table",
+      "title": "Scheduled Rollouts",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 80,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PF70FA7EDACA091DA"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT id as \"ID\",\n                  fire_at as \"Fire at\",\n                  target_version as \"Target\",\n                  strategy as \"Strategy\",\n                  json_array_length(target_devices::json) as \"Devices\",\n                  status as \"Status\",\n                  fired_at as \"Fired at\",\n                  COALESCE(error,'') as \"Error\"\n             FROM scheduled_rollouts\n         ORDER BY fire_at DESC\n            LIMIT 30",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 26,
+      "type": "table",
+      "title": "Rollout Campaigns (grouped OTA events)",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PF70FA7EDACA091DA"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 80,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PF70FA7EDACA091DA"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('minute', started_at) as \"Started\",\n                  to_version as \"Target\",\n                  count(*) as \"Total\",\n                  sum(case when status='success' then 1 else 0 end) as \"Success\",\n                  sum(case when status='failed'  then 1 else 0 end) as \"Failed\",\n                  sum(case when status in ('pending','downloading','flashing') then 1 else 0 end) as \"In flight\"\n             FROM ota_events\n         GROUP BY date_trunc('minute', started_at), to_version\n         ORDER BY date_trunc('minute', started_at) DESC\n            LIMIT 30",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      }
     }
   ],
   "version": 1

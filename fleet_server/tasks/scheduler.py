@@ -104,6 +104,17 @@ async def fire_due_scheduled_rollouts(db: AsyncSession | None = None) -> list[in
                     "Scheduled rollout #%d fired → %s on %d devices",
                     row.id, row.target_version, len(row.target_devices),
                 )
+                # Audit log the fire (no user; scheduler-attributed).
+                from fleet_server.services.audit import AuditService
+                await AuditService(session).log(
+                    "schedule_fired",
+                    "rollout",
+                    {
+                        "id": row.id,
+                        "target_version": row.target_version,
+                        "total_devices": len(row.target_devices),
+                    },
+                )
             except Exception as err:  # noqa: BLE001
                 row.status = "failed"
                 row.error = str(err)[:1000]

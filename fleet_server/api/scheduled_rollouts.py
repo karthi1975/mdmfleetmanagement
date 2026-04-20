@@ -14,8 +14,13 @@ from fleet_server.schemas.scheduled_rollout import (
     ScheduledRolloutCreate,
     ScheduledRolloutResponse,
 )
+from fleet_server.services.audit import AuditService
 
 router = APIRouter()
+
+
+def _audit(db: AsyncSession, user: User | None) -> AuditService:
+    return AuditService(db, user_id=user.id if user else None)
 
 
 @router.get("/", response_model=list[ScheduledRolloutResponse])
@@ -57,6 +62,16 @@ async def create_scheduled(
     db.add(row)
     await db.commit()
     await db.refresh(row)
+    await _audit(db, user).log(
+        "schedule",
+        "rollout",
+        {
+            "id": row.id,
+            "target_version": row.target_version,
+            "fire_at": row.fire_at.isoformat(),
+            "total_devices": len(row.target_devices),
+        },
+    )
     return row
 
 
@@ -65,7 +80,11 @@ async def create_scheduled(
     response_model=ScheduledRolloutResponse,
     dependencies=[Depends(require_role("admin", "operator"))],
 )
-async def cancel_scheduled(scheduled_id: int, db: AsyncSession = Depends(get_db)):
+async def cancel_scheduled(
+    scheduled_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     row = await db.get(ScheduledRollout, scheduled_id)
     if not row:
         raise HTTPException(404, "Not found")
@@ -74,4 +93,9 @@ async def cancel_scheduled(scheduled_id: int, db: AsyncSession = Depends(get_db)
     row.status = "cancelled"
     await db.commit()
     await db.refresh(row)
+    await _audit(db, user).log(
+        "cancel",
+        "rollout",
+        {"id": row.id, "target_version": row.target_version},
+    )
     return row
