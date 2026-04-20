@@ -75,6 +75,19 @@
     .pager { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.5rem; }
     .pager-info { color: var(--muted); font-size: 0.8rem; flex: 1; text-align: center; }
     .pager button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.4rem; }
+    .chip-row .chip { background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; padding: 0.25rem 0.55rem; border-radius: 999px; font-size: 0.78rem; cursor: pointer; font-weight: 500; }
+    .chip-row .chip:hover { background: #c7d2fe; }
+    .ota-groups { display: flex; gap: 0.4rem; margin-bottom: 0.4rem; flex-wrap: wrap; align-items: center; }
+    .ota-groups select { flex: 1; min-width: 180px; }
+    .rollout-cta { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; margin-top: 0.8rem; }
+    .rollout-cta .primary { flex: 1; margin-top: 0; min-width: 200px; }
+    .rollout-schedule { display: flex; align-items: center; gap: 0.4rem; flex: 1; min-width: 280px; color: var(--muted); font-size: 0.85rem; }
+    .rollout-schedule input[type="datetime-local"] { flex: 1; padding: 0.5rem; font-size: 0.9rem; }
+    .rollout-schedule button { margin: 0; }
+    .sched-status-pending { color: var(--warn); font-weight: 600; }
+    .sched-status-fired { color: var(--ok); font-weight: 600; }
+    .sched-status-cancelled, .sched-status-failed { color: var(--err); font-weight: 600; }
     .status-pill {
       display: inline-block; padding: 0.1rem 0.5rem; border-radius: 10px;
       font-size: 0.75rem; font-weight: 600;
@@ -198,6 +211,15 @@
             <select id="otaHome"><option value="">All homes</option></select>
             <select id="otaVer"><option value="">All versions</option></select>
             <label class="ota-alive"><input type="checkbox" id="otaAlive" checked /> alive only</label>
+            <label class="ota-alive" title="Hide devices that already run the Target version">
+              <input type="checkbox" id="otaExcludeTarget" /> exclude on-target
+            </label>
+          </div>
+          <div class="chip-row" id="otaHomeChips" hidden></div>
+          <div class="ota-groups">
+            <select id="otaGroupLoad"><option value="">Load saved group…</option></select>
+            <button type="button" id="otaGroupSave" class="small" title="Save the current selection as a reusable group">Save selection as group…</button>
+            <button type="button" id="otaGroupDelete" class="small" hidden>Delete group</button>
           </div>
           <div class="ota-actions">
             <button type="button" id="otaSelectAll" class="small">Select all visible</button>
@@ -211,8 +233,22 @@
           </div>
         </div>
       </div>
-      <button id="otaBtn" class="primary">Start OTA rollout</button>
+      <div class="rollout-cta">
+        <button id="otaBtn" class="primary">Start OTA rollout now</button>
+        <div class="rollout-schedule">
+          <label for="otaFireAt" style="margin:0">Or schedule for</label>
+          <input type="datetime-local" id="otaFireAt" />
+          <button type="button" id="otaScheduleBtn" class="small">Schedule</button>
+        </div>
+      </div>
       <div id="otaMsg" class="msg" hidden></div>
+    </div>
+
+    <div class="card">
+      <h2>Scheduled rollouts <span id="schedCount" class="count"></span></h2>
+      <table id="schedTable"><thead>
+        <tr><th>ID</th><th>Fire at</th><th>Target</th><th>Devices</th><th>Status</th><th></th></tr>
+      </thead><tbody></tbody></table>
     </div>
 
     <div class="card">
@@ -354,11 +390,14 @@ const otaState = {
   home: '',
   version: '',
   aliveOnly: true,
+  excludeOnTarget: false,
   page: 0,
   limit: 50,
   total: 0,
   items: [],
-  facets: { homes: [], versions: [] },
+  facets: { homes: [], versions: [], homeCounts: {} },
+  groups: [],
+  loadedGroupId: '',
   searchDebounce: null,
 };
 
@@ -423,10 +462,25 @@ async function loadOtaPicker() {
   if (otaState.home) params.set('home_id', otaState.home);
   if (otaState.version) params.set('firmware_version', otaState.version);
   if (otaState.aliveOnly) params.set('status', 'alive');
-  const r = await api(`/api/devices/?${params.toString()}`);
+  let r = await api(`/api/devices/?${params.toString()}`);
+
+  // Client-side post-filter for "exclude on target" — the API doesn't
+  // support "not equal" queries; this filter removes devices whose
+  // firmware already matches the current OTA target version.
+  if (otaState.excludeOnTarget) {
+    const target = $('otaVersion').value;
+    if (target) {
+      const before = r.items.length;
+      r.items = r.items.filter(d => d.firmware_version !== target);
+      // Total is approximate when post-filtering; good enough for UI.
+      r.total = Math.max(0, r.total - (before - r.items.length));
+    }
+  }
+
   otaState.items = r.items;
   otaState.total = r.total;
   renderOtaPicker();
+  renderHomeChips();
 }
 
 async function loadOtaFacets() {
@@ -437,9 +491,64 @@ async function loadOtaFacets() {
     ]);
     otaState.facets.homes = homes;
     otaState.facets.versions = [...versions].reverse(); // newest first
+    // Count devices per home (one cheap call each, parallel) for the
+    // chip labels. For fleets with many homes, migrate to a single
+    // /facets/home_id?with_counts=1 endpoint later.
+    const counts = {};
+    await Promise.all(homes.map(async h => {
+      try {
+        const r = await api(`/api/devices/?home_id=${encodeURIComponent(h)}&limit=1`);
+        counts[h] = r.total;
+      } catch { counts[h] = 0; }
+    }));
+    otaState.facets.homeCounts = counts;
   } catch (err) {
     console.error('facets fetch failed', err);
   }
+}
+
+function renderHomeChips() {
+  const el = $('otaHomeChips');
+  const homes = otaState.facets.homes || [];
+  if (homes.length === 0) { el.hidden = true; el.innerHTML = ''; return; }
+  el.hidden = false;
+  el.innerHTML = '<small style="color:var(--muted);font-size:0.75rem;width:100%;margin-bottom:0.1rem">Quick select:</small>' +
+    homes.map(h => {
+      const n = otaState.facets.homeCounts[h] ?? '?';
+      return `<button type="button" class="chip" data-home="${h.replace(/"/g, '&quot;')}">${h} (${n})</button>`;
+    }).join('');
+}
+
+async function loadDeviceGroups() {
+  try {
+    otaState.groups = await api('/api/device-groups/');
+  } catch { otaState.groups = []; }
+  const sel = $('otaGroupLoad');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Load saved group…</option>' +
+    otaState.groups.map(g =>
+      `<option value="${g.id}">${g.name} (${g.member_count})</option>`
+    ).join('');
+  if (cur && otaState.groups.some(g => String(g.id) === cur)) sel.value = cur;
+}
+
+async function loadScheduledRollouts() {
+  let rows = [];
+  try { rows = await api('/api/scheduled-rollouts/'); } catch { rows = []; }
+  $('schedCount').textContent = `(${rows.length})`;
+  const tbody = $('schedTable').querySelector('tbody');
+  tbody.innerHTML = rows.map(r => {
+    const canCancel = r.status === 'pending';
+    const err = r.error ? `<br><small style="color:var(--err)">${r.error}</small>` : '';
+    return `<tr>
+      <td>${r.id}</td>
+      <td>${fmtDate(r.fire_at)}</td>
+      <td>v${r.target_version}<br><small style="color:var(--muted)">${r.strategy}</small></td>
+      <td>${r.target_devices.length}</td>
+      <td><span class="sched-status-${r.status}">${r.status}</span>${err}</td>
+      <td>${canCancel ? `<button type="button" class="small" data-cancel="${r.id}">Cancel</button>` : ''}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:0.8rem">No scheduled rollouts.</td></tr>';
 }
 
 function setupOtaPicker() {
@@ -460,12 +569,23 @@ function setupOtaPicker() {
   $('otaAlive').addEventListener('change', e => {
     otaState.aliveOnly = e.target.checked; otaState.page = 0; loadOtaPicker();
   });
+  $('otaExcludeTarget').addEventListener('change', e => {
+    otaState.excludeOnTarget = e.target.checked; otaState.page = 0; loadOtaPicker();
+  });
+  $('otaVersion').addEventListener('change', () => {
+    // Target version drives the "exclude on target" post-filter.
+    if (otaState.excludeOnTarget) loadOtaPicker();
+  });
   $('otaSelectAll').addEventListener('click', () => {
     for (const d of otaState.items) otaState.selected.add(d.device_id);
     renderOtaPicker();
   });
   $('otaClear').addEventListener('click', () => {
-    otaState.selected.clear(); renderOtaPicker();
+    otaState.selected.clear();
+    otaState.loadedGroupId = '';
+    $('otaGroupLoad').value = '';
+    $('otaGroupDelete').hidden = true;
+    renderOtaPicker();
   });
   $('otaPrev').addEventListener('click', () => {
     if (otaState.page > 0) { otaState.page--; loadOtaPicker(); }
@@ -481,6 +601,83 @@ function setupOtaPicker() {
     renderOtaPicker();
   });
 
+  // Home chips → select every device in that home (one fetch per click,
+  // unpaginated within a single home — reasonable for patient homes).
+  $('otaHomeChips').addEventListener('click', async e => {
+    const btn = e.target.closest('[data-home]');
+    if (!btn) return;
+    const home = btn.dataset.home;
+    try {
+      const r = await api(`/api/devices/?home_id=${encodeURIComponent(home)}&limit=500`);
+      for (const d of r.items) otaState.selected.add(d.device_id);
+      renderOtaPicker();
+    } catch (err) { showOtaMsg('err', 'Failed to load home: ' + err.message); }
+  });
+
+  // Saved groups: load, save, delete
+  $('otaGroupLoad').addEventListener('change', async e => {
+    const id = e.target.value;
+    otaState.loadedGroupId = id;
+    $('otaGroupDelete').hidden = !id;
+    if (!id) return;
+    try {
+      const g = await api(`/api/device-groups/${id}`);
+      otaState.selected = new Set(g.device_ids);
+      renderOtaPicker();
+      showOtaMsg('ok', `Loaded group "${g.name}" (${g.device_ids.length} devices).`);
+    } catch (err) { showOtaMsg('err', 'Load failed: ' + err.message); }
+  });
+  $('otaGroupSave').addEventListener('click', async () => {
+    if (otaState.selected.size === 0) return showOtaMsg('err', 'Select at least one device first');
+    const name = prompt('Name for this group:');
+    if (!name || !name.trim()) return;
+    const description = prompt('Optional description (leave blank for none):') || '';
+    try {
+      const g = await api('/api/device-groups/', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: name.trim(),
+          description: description.trim() || null,
+          device_ids: [...otaState.selected],
+        }),
+      });
+      await loadDeviceGroups();
+      $('otaGroupLoad').value = String(g.id);
+      otaState.loadedGroupId = String(g.id);
+      $('otaGroupDelete').hidden = false;
+      showOtaMsg('ok', `Saved group "${g.name}".`);
+    } catch (err) { showOtaMsg('err', 'Save failed: ' + err.message); }
+  });
+  $('otaGroupDelete').addEventListener('click', async () => {
+    const id = otaState.loadedGroupId;
+    if (!id) return;
+    const g = otaState.groups.find(x => String(x.id) === id);
+    if (!confirm(`Delete group "${g?.name}"? This does not delete the devices.`)) return;
+    try {
+      await api(`/api/device-groups/${id}`, { method: 'DELETE' });
+      otaState.loadedGroupId = '';
+      $('otaGroupLoad').value = '';
+      $('otaGroupDelete').hidden = true;
+      await loadDeviceGroups();
+      showOtaMsg('ok', 'Group deleted.');
+    } catch (err) { showOtaMsg('err', 'Delete failed: ' + err.message); }
+  });
+
+  // Schedule-for-later button
+  $('otaScheduleBtn').addEventListener('click', scheduleRollout);
+
+  // Scheduled-rollouts table: cancel button
+  $('schedTable').addEventListener('click', async e => {
+    const btn = e.target.closest('[data-cancel]');
+    if (!btn) return;
+    const id = btn.dataset.cancel;
+    if (!confirm(`Cancel scheduled rollout #${id}?`)) return;
+    try {
+      await api(`/api/scheduled-rollouts/${id}/cancel`, { method: 'POST' });
+      loadScheduledRollouts();
+    } catch (err) { showOtaMsg('err', 'Cancel failed: ' + err.message); }
+  });
+
   // Device-table pager
   $('devPrev').addEventListener('click', () => {
     if (tableState.page > 0) { tableState.page--; loadDeviceTable(); }
@@ -489,6 +686,33 @@ function setupOtaPicker() {
     const maxPage = Math.max(0, Math.ceil(tableState.total / tableState.limit) - 1);
     if (tableState.page < maxPage) { tableState.page++; loadDeviceTable(); }
   });
+}
+
+async function scheduleRollout() {
+  const version = $('otaVersion').value;
+  const fireAtRaw = $('otaFireAt').value;
+  if (!version) return showOtaMsg('err', 'Pick a target version first');
+  if (!fireAtRaw) return showOtaMsg('err', 'Pick a fire time in the schedule input');
+  if (otaState.selected.size === 0) return showOtaMsg('err', 'Select at least one device');
+  // datetime-local inputs give a naive local time — convert to UTC ISO.
+  const fireAtIso = new Date(fireAtRaw).toISOString();
+  const payload = {
+    target_version: version,
+    strategy: $('otaStrategy').value,
+    target_devices: [...otaState.selected],
+    fire_at: fireAtIso,
+  };
+  if (payload.strategy === 'canary') {
+    payload.canary_count = parseInt($('otaCanary').value, 10) || 2;
+  }
+  try {
+    const r = await api('/api/scheduled-rollouts/', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    showOtaMsg('ok', `Scheduled rollout #${r.id} queued for ${fmtDate(r.fire_at)}.`);
+    $('otaFireAt').value = '';
+    loadScheduledRollouts();
+  } catch (err) { showOtaMsg('err', 'Schedule failed: ' + err.message); }
 }
 
 async function loadDeviceTable() {
@@ -524,8 +748,14 @@ async function loadDeviceTable() {
 
 async function loadDevices() {
   // Kept under the old name so existing callers (refresh, setInterval)
-  // continue to work; now fans out into the three server-side loads.
-  await Promise.all([loadDeviceTable(), loadOtaPicker(), loadOtaFacets()]);
+  // continue to work; now fans out into all server-side loads.
+  await Promise.all([
+    loadDeviceTable(),
+    loadOtaPicker(),
+    loadOtaFacets(),
+    loadDeviceGroups(),
+    loadScheduledRollouts(),
+  ]);
 }
 
 async function loadFirmware() {

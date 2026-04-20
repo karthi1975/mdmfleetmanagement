@@ -4,11 +4,13 @@ from fleet_server.api import (
     auth,
     broadcast,
     communities,
+    device_groups,
     devices,
     firmware,
     homes,
     ota,
     provisioning,
+    scheduled_rollouts,
 )
 from fleet_server.api.auth import require_role
 
@@ -41,6 +43,18 @@ api_router.include_router(
 )
 api_router.include_router(
     ota.router, prefix="/ota", tags=["ota"], dependencies=_any_auth
+)
+api_router.include_router(
+    device_groups.router,
+    prefix="/device-groups",
+    tags=["device-groups"],
+    dependencies=_any_auth,
+)
+api_router.include_router(
+    scheduled_rollouts.router,
+    prefix="/scheduled-rollouts",
+    tags=["scheduled-rollouts"],
+    dependencies=_any_auth,
 )
 
 # Provisioning mixes public (ESP Web Tools manifest + firmware download)
