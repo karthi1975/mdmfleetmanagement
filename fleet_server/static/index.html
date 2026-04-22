@@ -88,6 +88,7 @@
     .sched-status-pending { color: var(--warn); font-weight: 600; }
     .sched-status-fired { color: var(--ok); font-weight: 600; }
     .sched-status-cancelled, .sched-status-failed { color: var(--err); font-weight: 600; }
+    .role-tag { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; padding: 0 0.35rem; border-radius: 3px; font-family: ui-monospace, monospace; font-size: 0.7rem; font-weight: 600; }
     .status-pill {
       display: inline-block; padding: 0.1rem 0.5rem; border-radius: 10px;
       font-size: 0.75rem; font-weight: 600;
@@ -208,6 +209,7 @@
           <label>Target devices <span id="otaCounter" class="count" style="font-weight:400;color:var(--muted)"></span></label>
           <input type="search" id="otaSearch" placeholder="Search device, custom ID, name, home…" style="margin-bottom:0.4rem" />
           <div class="ota-filters">
+            <select id="otaRole" title="Filter by firmware family / role so mixed-framework rollouts stay in their lane"><option value="">All roles</option></select>
             <select id="otaHome"><option value="">All homes</option></select>
             <select id="otaVer"><option value="">All versions</option></select>
             <label class="ota-alive"><input type="checkbox" id="otaAlive" checked /> alive only</label>
@@ -396,6 +398,7 @@ const tableState = { page: 0, limit: 50, total: 0 };
 const otaState = {
   selected: new Set(),
   search: '',
+  role: '',
   home: '',
   version: '',
   aliveOnly: true,
@@ -404,7 +407,7 @@ const otaState = {
   limit: 50,
   total: 0,
   items: [],
-  facets: { homes: [], versions: [], homeCounts: {} },
+  facets: { roles: [], homes: [], versions: [], homeCounts: {} },
   groups: [],
   loadedGroupId: '',
   searchDebounce: null,
@@ -432,7 +435,7 @@ function renderOtaPicker() {
           <input type="checkbox" value="${d.device_id}" ${chk} />
           <div class="meta">
             <div class="primary-text">${primary}</div>
-            <div class="sub-text">${d.device_id} · v${d.firmware_version || '?'} · ${d.status}</div>
+            <div class="sub-text">${d.device_id} · v${d.firmware_version || '?'} · ${d.status}${d.role && d.role !== 'sensor' ? ' · <span class="role-tag">' + d.role + '</span>' : ''}</div>
           </div>
         </label>`);
     }
@@ -441,7 +444,11 @@ function renderOtaPicker() {
     '<div class="ota-empty">No devices match these filters.</div>';
 
   // Facet dropdowns come from the cheap /facets/ endpoint, so they
-  // show every home / version regardless of what the current page holds.
+  // show every role / home / version regardless of what the current
+  // page holds.
+  const roleSel = $('otaRole');
+  roleSel.innerHTML = '<option value="">All roles</option>' +
+    otaState.facets.roles.map(r => `<option value="${r}" ${r === otaState.role ? 'selected' : ''}>${r}</option>`).join('');
   const homeSel = $('otaHome');
   homeSel.innerHTML = '<option value="">All homes</option>' +
     otaState.facets.homes.map(h => `<option value="${h}" ${h === otaState.home ? 'selected' : ''}>${h}</option>`).join('');
@@ -468,6 +475,7 @@ async function loadOtaPicker() {
     sort: '-last_seen',
   });
   if (otaState.search.trim()) params.set('search', otaState.search.trim());
+  if (otaState.role) params.set('role', otaState.role);
   if (otaState.home) params.set('home_id', otaState.home);
   if (otaState.version) params.set('firmware_version', otaState.version);
   if (otaState.aliveOnly) params.set('status', 'alive');
@@ -494,10 +502,12 @@ async function loadOtaPicker() {
 
 async function loadOtaFacets() {
   try {
-    const [homes, versions] = await Promise.all([
+    const [roles, homes, versions] = await Promise.all([
+      api('/api/devices/facets/role'),
       api('/api/devices/facets/home_id'),
       api('/api/devices/facets/firmware_version'),
     ]);
+    otaState.facets.roles = roles;
     otaState.facets.homes = homes;
     otaState.facets.versions = [...versions].reverse(); // newest first
     // Count devices per home (one cheap call each, parallel) for the
@@ -568,6 +578,9 @@ function setupOtaPicker() {
       otaState.page = 0;
       loadOtaPicker();
     }, 300);
+  });
+  $('otaRole').addEventListener('change', e => {
+    otaState.role = e.target.value; otaState.page = 0; loadOtaPicker();
   });
   $('otaHome').addEventListener('change', e => {
     otaState.home = e.target.value; otaState.page = 0; loadOtaPicker();

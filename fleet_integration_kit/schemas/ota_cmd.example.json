@@ -1,0 +1,7 @@
+{
+  "_comment": "Received when admin triggers a rollout. Subscribe to: fleet/<DEVICE_ID>/ota/cmd (qos=0). On receipt, download the .bin from 'url' (HTTPS, pin the fleet CA), flash via esp_https_ota, publish status, reboot.",
+
+  "version": "arduino-pir-1.1.0",
+  "url": "https://fleet-mqtt.homeadapt.us/firmware/arduino-pir-1.1.0/firmware.bin",
+  "checksum": "4e1f29d74321c4cd8781a1d3ce5378491041d0c3368a565bf1e0a7136150f4fe"
+}

@@ -1,0 +1,21 @@
+{
+  "_comment": "OPTIONAL — publish ONCE per sensor on first-boot-after-provisioning with retain=true. Topic: homeassistant/<component>/<DEVICE_ID>/<sensor>/config. This makes Home Assistant auto-add the device/entity with zero manual YAML. Component = binary_sensor for digital, sensor for analog/numeric. One config message per sensor.",
+
+  "name": "Kitchen PIR Motion",
+  "unique_id": "esp32-fa48d0_motion",
+  "state_topic": "fleet/esp32-fa48d0/heartbeat",
+  "value_template": "{{ value_json.motion }}",
+  "payload_on": 1,
+  "payload_off": 0,
+  "device_class": "motion",
+  "availability_topic": "fleet/esp32-fa48d0/status",
+  "payload_available": "online",
+  "payload_not_available": "offline",
+  "device": {
+    "identifiers": ["esp32-fa48d0"],
+    "name": "Kitchen PIR",
+    "manufacturer": "tetradapt",
+    "model": "HomeAdapt Arduino PIR v1",
+    "sw_version": "arduino-pir-1.0.0"
+  }
+}

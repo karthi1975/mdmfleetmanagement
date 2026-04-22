@@ -1,0 +1,11 @@
+{
+  "_comment": "Published every 30 s to topic: fleet/<DEVICE_ID>/heartbeat (retain=false, qos=0). Only 'uptime' is strictly required; the rest are strongly recommended; additional fields are accepted and ignored by the backend.",
+
+  "uptime": 123,
+  "heap": 145000,
+  "rssi": -55,
+
+  "motion": 0,
+  "temperature_c": 22.4,
+  "humidity_pct": 41.0
+}

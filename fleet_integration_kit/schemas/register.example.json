@@ -1,0 +1,10 @@
+{
+  "_comment": "Published ONCE on boot to topic: fleet/<DEVICE_ID>/register (retain=false, qos=1). DEVICE_ID is the mac-suffixed string, e.g. esp32-fa48d0.",
+
+  "mac": "1C:C3:AB:FA:48:D0",
+  "version": "arduino-pir-1.0.0",
+  "role": "arduino_pir",
+  "home_id": "home-001",
+  "label": "Kitchen PIR",
+  "custom_id": "karthi-kitchen-pir-01"
+}

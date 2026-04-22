@@ -1,0 +1,6 @@
+{
+  "_comment": "Publish as the OTA progresses. Topic: fleet/<DEVICE_ID>/ota/status (qos=0, retain=false). Four possible status values: downloading, flashing, success, failed. Publish the final status just before rebooting; loop the MQTT client briefly so it actually flushes.",
+
+  "status": "success",
+  "version": "arduino-pir-1.1.0"
+}
