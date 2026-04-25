@@ -1,0 +1,36 @@
+{
+  "uid": "ota-rollout",
+  "title": "Start OTA",
+  "tags": ["fleet", "admin", "ota"],
+  "editable": false,
+  "graphTooltip": 0,
+  "schemaVersion": 39,
+  "timezone": "browser",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {
+    "hidden": true
+  },
+  "refresh": "",
+  "hideControls": true,
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "h": 32,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "html",
+        "content": "<iframe src=\"/admin/?embedded=1#/ota\" style=\"width:100%; height:calc(100vh - 110px); min-height:600px; border:0; border-radius:6px; background:#f7f7f9;\" referrerpolicy=\"same-origin\"></iframe>"
+      },
+      "transparent": true
+    }
+  ]
+}
