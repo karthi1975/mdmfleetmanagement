@@ -537,9 +537,8 @@ $('loginForm').addEventListener('submit', async e => {
     localStorage.setItem(TOKEN_KEY, data.access_token);
     localStorage.setItem(ROLE_KEY, data.role);
     localStorage.setItem(EMAIL_KEY, email);
-    // Standalone /admin/: send user straight to the unified /grafana/ view.
-    // Embedded iframe: just reveal the dashboard inside.
-    if (!EMBEDDED) { window.location.href = '/grafana/'; return; }
+    // /admin/ is the primary shell now — stay here. Charts live as
+    // Grafana /d-solo/ iframes inside the Devices page.
     showApp();
   } catch (err) {
     $('loginMsg').hidden = false;
