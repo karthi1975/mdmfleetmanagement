@@ -24,9 +24,43 @@
     header h1 { margin: 0; font-size: 1.1rem; }
     header .who { color: var(--muted); font-size: 0.9rem; }
     header button { background: none; border: 1px solid var(--border); padding: 0.3rem 0.7rem; border-radius: 6px; cursor: pointer; margin-left: 0.5rem; }
-    main { max-width: 1100px; margin: 1.5rem auto; padding: 0 1.25rem; }
+    main { flex: 1; max-width: 1100px; margin: 1.5rem auto; padding: 0 1.25rem; min-width: 0; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+    /* Left-nav SPA shell */
+    .app-shell { display: flex; align-items: flex-start; gap: 0; min-height: calc(100vh - 56px); }
+    .sidenav {
+      width: 200px; flex-shrink: 0; padding: 1.2rem 0;
+      background: var(--card); border-right: 1px solid var(--border);
+      position: sticky; top: 0; align-self: stretch;
+    }
+    .sidenav nav { display: flex; flex-direction: column; }
+    .sidenav a {
+      display: block; padding: 0.55rem 1.1rem; color: var(--text);
+      text-decoration: none; font-size: 0.92rem; border-left: 3px solid transparent;
+      cursor: pointer;
+    }
+    .sidenav a:hover { background: var(--bg); }
+    .sidenav a.active {
+      background: #eef2ff; color: var(--accent);
+      border-left-color: var(--accent); font-weight: 600;
+    }
+    .sidenav .nav-group { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 0.8rem 1.1rem 0.3rem; font-weight: 600; }
+    section[data-page] { display: none; }
+    section[data-page].active { display: block; }
+    /* Embedded (Grafana iframe) — hide sidenav, render single page */
+    .embedded .app-shell { display: block; min-height: 0; }
+    .embedded .sidenav { display: none; }
+    .embedded main { margin: 0; }
+    /* Narrow viewport — sidenav above content */
+    @media (max-width: 800px) {
+      .app-shell { flex-direction: column; }
+      .sidenav { width: 100%; position: static; padding: 0.4rem 0; border-right: none; border-bottom: 1px solid var(--border); }
+      .sidenav nav { flex-direction: row; flex-wrap: wrap; padding: 0 0.5rem; }
+      .sidenav a { padding: 0.5rem 0.8rem; border-left: none; border-bottom: 3px solid transparent; }
+      .sidenav a.active { border-left: none; border-bottom-color: var(--accent); }
+      .sidenav .nav-group { display: none; }
+    }
     .card {
       background: var(--card); border: 1px solid var(--border);
       border-radius: 10px; padding: 1.1rem 1.25rem; margin-bottom: 1rem;
@@ -161,8 +195,20 @@
     </div>
   </header>
 
+  <div class="app-shell">
+  <aside class="sidenav">
+    <nav>
+      <div class="nav-group">Fleet</div>
+      <a data-route="devices">📡 Devices</a>
+      <a data-route="firmware">📦 Firmware</a>
+      <a data-route="ota">🚀 OTA Rollout</a>
+      <div class="nav-group admin-only">Administration</div>
+      <a data-route="users" class="admin-only">👥 Users</a>
+    </nav>
+  </aside>
+
   <main>
-    <div class="grid">
+    <section data-page="devices">
       <div class="card">
         <h2>Devices <span id="devCount" class="count"></span></h2>
         <table id="devTable"><thead>
@@ -174,14 +220,15 @@
           <button type="button" id="devNext" class="small">Next →</button>
         </div>
       </div>
+    </section>
 
+    <section data-page="firmware">
       <div class="card">
         <h2>Firmware versions <span id="fwCount" class="count"></span></h2>
         <table id="fwTable"><thead>
           <tr><th>Version</th><th>Path</th><th>Notes</th><th>Uploaded</th></tr>
         </thead><tbody></tbody></table>
       </div>
-    </div>
 
     <div class="card">
       <h2>Upload firmware</h2>
@@ -210,6 +257,12 @@
       <div id="fwMsg" class="msg" hidden></div>
     </div>
 
+    <p style="margin: 0.6rem 0 1rem; color: var(--muted); font-size: 0.88rem">
+      Uploaded a new build? Head to <a href="#/ota" style="color: var(--accent)">OTA Rollout →</a> to push it to devices.
+    </p>
+    </section>
+
+    <section data-page="ota">
     <div class="card">
       <h2>Trigger OTA rollout</h2>
       <div class="grid">
@@ -293,7 +346,9 @@
         <tr><th>ID</th><th>Device</th><th>From → To</th><th>Status</th><th>Started</th><th>Completed</th></tr>
       </thead><tbody></tbody></table>
     </div>
+    </section>
 
+    <section data-page="users">
     <div class="card" id="usersCard" hidden>
       <h2>Users <span id="userCount" class="count"></span></h2>
       <div class="users-toolbar">
@@ -304,7 +359,9 @@
       </thead><tbody></tbody></table>
       <div id="usersMsg" class="msg" hidden></div>
     </div>
+    </section>
   </main>
+  </div>
 </div>
 
 <!-- Modal: Add user -->
@@ -419,6 +476,8 @@ function showApp() {
   const email = localStorage.getItem(EMAIL_KEY) || '';
   const role = localStorage.getItem(ROLE_KEY) || '';
   $('who').textContent = email ? `${email} (${role})` : '';
+  applyAdminVisibility();
+  applyRoute();
   refresh();
 }
 function logout() {
@@ -488,6 +547,45 @@ if (EMBEDDED) {
   `;
   document.head.appendChild(style);
 }
+
+// ── Hash routing for the SPA shell ────────────────────────────────
+const VALID_ROUTES = new Set(['devices', 'firmware', 'ota', 'users']);
+
+function currentRoute() {
+  const r = (location.hash || '').replace(/^#\/?/, '');
+  return VALID_ROUTES.has(r) ? r : 'devices';
+}
+
+function applyRoute() {
+  let route = currentRoute();
+  // Non-admins can't see the Users page even via direct URL.
+  if (route === 'users' && localStorage.getItem(ROLE_KEY) !== 'admin') {
+    route = 'devices';
+    if (location.hash) history.replaceState(null, '', '#/devices');
+  }
+  document.querySelectorAll('section[data-page]').forEach(s => {
+    s.classList.toggle('active', s.dataset.page === route);
+  });
+  document.querySelectorAll('.sidenav a[data-route]').forEach(a => {
+    a.classList.toggle('active', a.dataset.route === route);
+  });
+}
+
+function applyAdminVisibility() {
+  const isAdmin = localStorage.getItem(ROLE_KEY) === 'admin';
+  document.querySelectorAll('.admin-only').forEach(el => {
+    el.style.display = isAdmin ? '' : 'none';
+  });
+}
+
+document.querySelectorAll('.sidenav a[data-route]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    location.hash = '#/' + a.dataset.route;
+  });
+});
+
+window.addEventListener('hashchange', applyRoute);
 
 // ── Dashboard ─────────────────────────────────────────────────────
 function fmtDate(s) {
