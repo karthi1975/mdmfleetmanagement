@@ -103,6 +103,30 @@
       min-height: 60vh; display: flex; align-items: center; justify-content: center;
     }
     .login-wrap .card { width: 100%; max-width: 380px; }
+    .users-toolbar { display: flex; justify-content: flex-end; margin-bottom: 0.6rem; }
+    .users-toolbar button { width: auto; margin: 0; }
+    select.role-select { width: auto; padding: 0.2rem 0.4rem; font-size: 0.85rem; }
+    .row-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .row-actions button { width: auto; padding: 0.25rem 0.55rem; font-size: 0.78rem; }
+    .pill-active { background: #d1fae5; color: var(--ok); padding: 0.1rem 0.5rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600; }
+    .pill-inactive { background: #fee2e2; color: var(--err); padding: 0.1rem 0.5rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600; }
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+      display: flex; align-items: center; justify-content: center; z-index: 1000;
+    }
+    .modal {
+      background: var(--card); border-radius: 10px; padding: 1.4rem;
+      width: 100%; max-width: 460px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    .modal h3 { margin: 0 0 1rem; font-size: 1.05rem; }
+    .modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
+    .modal-actions button { width: auto; margin: 0; padding: 0.45rem 0.9rem; }
+    .pw-reveal {
+      font-family: ui-monospace, monospace; font-size: 0.95rem;
+      background: #f3f4f6; padding: 0.6rem 0.75rem; border-radius: 7px;
+      word-break: break-all; user-select: all;
+    }
+    .pw-warn { color: var(--warn); font-size: 0.82rem; margin-top: 0.5rem; }
   </style>
 </head>
 <body>
@@ -268,7 +292,66 @@
         <tr><th>ID</th><th>Device</th><th>From → To</th><th>Status</th><th>Started</th><th>Completed</th></tr>
       </thead><tbody></tbody></table>
     </div>
+
+    <div class="card" id="usersCard" hidden>
+      <h2>Users <span id="userCount" class="count"></span></h2>
+      <div class="users-toolbar">
+        <button type="button" id="addUserBtn" class="primary">+ Add user</button>
+      </div>
+      <table id="usersTable"><thead>
+        <tr><th>ID</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr>
+      </thead><tbody></tbody></table>
+      <div id="usersMsg" class="msg" hidden></div>
+    </div>
   </main>
+</div>
+
+<!-- Modal: Add user -->
+<div id="addUserModal" class="modal-backdrop" hidden>
+  <div class="modal">
+    <h3>Add user</h3>
+    <div class="row">
+      <label for="newUserId">User ID</label>
+      <input type="text" id="newUserId" placeholder="e.g. dave" />
+    </div>
+    <div class="row">
+      <label for="newUserEmail">Email</label>
+      <input type="email" id="newUserEmail" placeholder="dave@tetradapt.us" />
+    </div>
+    <div class="row">
+      <label for="newUserRole">Role</label>
+      <select id="newUserRole">
+        <option value="admin">admin (full access incl. firmware + OTA)</option>
+        <option value="operator">operator</option>
+        <option value="viewer" selected>viewer (read-only)</option>
+      </select>
+    </div>
+    <div class="row">
+      <label for="newUserPw">Password (leave blank to auto-generate)</label>
+      <input type="text" id="newUserPw" placeholder="auto-generate" />
+    </div>
+    <div id="addUserMsg" class="msg err" hidden></div>
+    <div class="modal-actions">
+      <button type="button" id="addUserCancel" class="small">Cancel</button>
+      <button type="button" id="addUserSave" class="primary">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Reveal password (one-time) -->
+<div id="pwModal" class="modal-backdrop" hidden>
+  <div class="modal">
+    <h3 id="pwModalTitle">New password</h3>
+    <p style="margin:0 0 0.6rem; color: var(--muted); font-size: 0.88rem">
+      Copy now — this password is shown once and cannot be retrieved later.
+    </p>
+    <div class="pw-reveal" id="pwReveal"></div>
+    <div class="pw-warn">Hand it to the user over a secure channel (1Password, Signal). Don't email it.</div>
+    <div class="modal-actions">
+      <button type="button" id="pwCopy" class="small">Copy</button>
+      <button type="button" id="pwClose" class="primary">Done</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -876,10 +959,174 @@ async function loadEvents() {
 
 async function refresh() {
   try {
-    await Promise.all([loadDevices(), loadFirmware(), loadEvents()]);
+    await Promise.all([loadDevices(), loadFirmware(), loadEvents(), loadUsers()]);
   } catch (err) {
     if (err.message !== 'unauthorized') console.error(err);
   }
+}
+
+// ── Users management (admin only) ─────────────────────────────────
+function isAdmin() { return localStorage.getItem(ROLE_KEY) === 'admin'; }
+function currentUserId() { return localStorage.getItem(EMAIL_KEY) || ''; }
+
+async function loadUsers() {
+  if (!isAdmin()) { $('usersCard').hidden = true; return; }
+  $('usersCard').hidden = false;
+  let users;
+  try {
+    users = await api('/api/auth/users');
+  } catch (err) {
+    if (err.message !== 'unauthorized') showUsersMsg('err', err.message);
+    return;
+  }
+  $('userCount').textContent = `(${users.length})`;
+  const tbody = $('usersTable').querySelector('tbody');
+  const myEmail = currentUserId();
+  tbody.innerHTML = users.map(u => {
+    const isSelf = u.email === myEmail || u.id === myEmail;
+    const statusPill = u.is_active
+      ? '<span class="pill-active">active</span>'
+      : '<span class="pill-inactive">inactive</span>';
+    const roleSelect = isSelf
+      ? `<span class="role-tag">${escapeHtml(u.role)}</span>`
+      : `<select class="role-select" data-id="${escapeAttr(u.id)}" onchange="changeRole(this)">
+          ${['admin','operator','viewer'].map(r =>
+            `<option value="${r}" ${r === u.role ? 'selected' : ''}>${r}</option>`
+          ).join('')}
+         </select>`;
+    const actions = isSelf
+      ? '<span style="color:var(--muted);font-size:0.8rem">(you)</span>'
+      : `<div class="row-actions">
+          <button class="small" onclick="resetPassword('${escapeAttr(u.id)}')">Reset PW</button>
+          <button class="small" onclick="toggleActive('${escapeAttr(u.id)}', ${!u.is_active})">${u.is_active ? 'Deactivate' : 'Activate'}</button>
+         </div>`;
+    return `<tr>
+      <td><code>${escapeHtml(u.id)}</code></td>
+      <td>${escapeHtml(u.email)}</td>
+      <td>${roleSelect}</td>
+      <td>${statusPill}</td>
+      <td>${actions}</td>
+    </tr>`;
+  }).join('');
+}
+
+function showUsersMsg(cls, text) {
+  const el = $('usersMsg');
+  el.hidden = false;
+  el.className = 'msg ' + cls;
+  el.textContent = text;
+  setTimeout(() => { el.hidden = true; }, 4000);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+function escapeAttr(s) { return escapeHtml(s); }
+
+async function changeRole(select) {
+  const id = select.dataset.id;
+  const role = select.value;
+  try {
+    await api(`/api/auth/users/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    });
+    showUsersMsg('ok', `${id} → ${role}`);
+    loadUsers();
+  } catch (err) {
+    showUsersMsg('err', err.message);
+    loadUsers();  // revert dropdown
+  }
+}
+
+async function toggleActive(id, makeActive) {
+  const verb = makeActive ? 'activate' : 'deactivate';
+  if (!confirm(`${verb[0].toUpperCase()+verb.slice(1)} user "${id}"?`)) return;
+  try {
+    await api(`/api/auth/users/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_active: makeActive }),
+    });
+    showUsersMsg('ok', `${id} ${verb}d`);
+    loadUsers();
+  } catch (err) {
+    showUsersMsg('err', err.message);
+  }
+}
+
+async function resetPassword(id) {
+  if (!confirm(`Reset password for "${id}"? This invalidates their current password.`)) return;
+  try {
+    const data = await api(`/api/auth/users/${encodeURIComponent(id)}/reset-password`, {
+      method: 'POST',
+    });
+    revealPassword(`Password reset — ${id}`, data.password);
+  } catch (err) {
+    showUsersMsg('err', err.message);
+  }
+}
+
+function revealPassword(title, password) {
+  $('pwModalTitle').textContent = title;
+  $('pwReveal').textContent = password;
+  $('pwModal').hidden = false;
+}
+
+$('pwClose').addEventListener('click', () => { $('pwModal').hidden = true; });
+$('pwCopy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('pwReveal').textContent);
+    $('pwCopy').textContent = 'Copied!';
+    setTimeout(() => { $('pwCopy').textContent = 'Copy'; }, 1500);
+  } catch {}
+});
+
+$('addUserBtn').addEventListener('click', () => {
+  $('newUserId').value = '';
+  $('newUserEmail').value = '';
+  $('newUserRole').value = 'viewer';
+  $('newUserPw').value = '';
+  $('addUserMsg').hidden = true;
+  $('addUserModal').hidden = false;
+});
+$('addUserCancel').addEventListener('click', () => { $('addUserModal').hidden = true; });
+$('addUserSave').addEventListener('click', async () => {
+  const id = $('newUserId').value.trim();
+  const email = $('newUserEmail').value.trim();
+  const role = $('newUserRole').value;
+  let password = $('newUserPw').value;
+  if (!id || !email) {
+    $('addUserMsg').hidden = false;
+    $('addUserMsg').textContent = 'User ID and email are required';
+    return;
+  }
+  const generated = !password;
+  if (generated) password = generatePassword();
+  try {
+    await api('/api/auth/users', {
+      method: 'POST',
+      body: JSON.stringify({ id, email, password, role }),
+    });
+    $('addUserModal').hidden = true;
+    if (generated) {
+      revealPassword(`User created — ${id}`, password);
+    } else {
+      showUsersMsg('ok', `Created ${id}`);
+    }
+    loadUsers();
+  } catch (err) {
+    $('addUserMsg').hidden = false;
+    $('addUserMsg').textContent = err.message;
+  }
+});
+
+function generatePassword(len = 16) {
+  const alphabet = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789-_';
+  const arr = new Uint32Array(len);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, n => alphabet[n % alphabet.length]).join('');
 }
 
 $('otaStrategy').addEventListener('change', e => {

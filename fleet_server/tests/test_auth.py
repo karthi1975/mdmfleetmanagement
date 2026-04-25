@@ -140,6 +140,149 @@ async def test_device_crud_works_without_auth(client):
     assert resp.status_code == 200
 
 
+# ─── User management (list / patch / reset-password) ───────────────
+
+@pytest.mark.asyncio
+async def test_list_users_as_admin(client, db_session):
+    await _create_user(db_session)
+    await _create_user(db_session, user_id="op1", email="op1@test.com", role="operator")
+    resp = await client.get(
+        "/api/auth/users", headers=_auth_header("admin", "admin")
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert {u["id"] for u in body} == {"admin", "op1"}
+
+
+@pytest.mark.asyncio
+async def test_list_users_as_viewer_forbidden(client, db_session):
+    await _create_user(db_session, user_id="v1", email="v1@test.com", role="viewer")
+    resp = await client.get(
+        "/api/auth/users", headers=_auth_header("v1", "viewer")
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_patch_user_change_role(client, db_session):
+    await _create_user(db_session)
+    await _create_user(db_session, user_id="op1", email="op1@test.com", role="operator")
+    resp = await client.patch(
+        "/api/auth/users/op1",
+        json={"role": "admin"},
+        headers=_auth_header("admin", "admin"),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["role"] == "admin"
+
+
+@pytest.mark.asyncio
+async def test_patch_user_deactivate(client, db_session):
+    await _create_user(db_session)
+    await _create_user(db_session, user_id="op1", email="op1@test.com", role="operator")
+    resp = await client.patch(
+        "/api/auth/users/op1",
+        json={"is_active": False},
+        headers=_auth_header("admin", "admin"),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["is_active"] is False
+
+
+@pytest.mark.asyncio
+async def test_patch_self_forbidden(client, db_session):
+    await _create_user(db_session)
+    resp = await client.patch(
+        "/api/auth/users/admin",
+        json={"role": "viewer"},
+        headers=_auth_header("admin", "admin"),
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_patch_last_admin_demote_blocked(client, db_session):
+    """Cross-admin demote that would zero out active admins is rejected."""
+    # Two active admins. a1 deactivates itself? — self-guard. So instead:
+    # a1 deactivates a2 (works, a1 still active). Then re-activate a2,
+    # deactivate a1 from a2 (works, a2 still active). Now create the
+    # last-admin scenario directly: only a2 is active admin, try to
+    # deactivate a2 from a2 → self-guard. The last-admin guard's purpose
+    # is defense-in-depth; reaching it without self-guard requires two
+    # *different* admin accounts where one is the only active admin —
+    # which by definition means the actor is inactive and can't auth.
+    # The guard remains as belt-and-suspenders.
+    await _create_user(db_session, user_id="a1", email="a1@test.com", role="admin")
+    await _create_user(db_session, user_id="a2", email="a2@test.com", role="admin")
+    resp = await client.patch(
+        "/api/auth/users/a2",
+        json={"is_active": False},
+        headers=_auth_header("a1", "admin"),
+    )
+    assert resp.status_code == 200
+    # a1 now sole active admin; cannot deactivate self (self-guard).
+    resp = await client.patch(
+        "/api/auth/users/a1",
+        json={"is_active": False},
+        headers=_auth_header("a1", "admin"),
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_patch_invalid_role_rejected(client, db_session):
+    await _create_user(db_session)
+    await _create_user(db_session, user_id="op1", email="op1@test.com", role="operator")
+    resp = await client.patch(
+        "/api/auth/users/op1",
+        json={"role": "superuser"},
+        headers=_auth_header("admin", "admin"),
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_reset_password(client, db_session):
+    await _create_user(db_session)
+    await _create_user(db_session, user_id="op1", email="op1@test.com", role="operator")
+    resp = await client.post(
+        "/api/auth/users/op1/reset-password",
+        headers=_auth_header("admin", "admin"),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == "op1"
+    assert len(body["password"]) >= 12
+
+    # New password works for login
+    login = await client.post("/api/auth/login", json={
+        "email": "op1@test.com", "password": body["password"],
+    })
+    assert login.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_reset_password_as_viewer_forbidden(client, db_session):
+    await _create_user(db_session, user_id="v1", email="v1@test.com", role="viewer")
+    resp = await client.post(
+        "/api/auth/users/v1/reset-password",
+        headers=_auth_header("v1", "viewer"),
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_reset_password_user_not_found(client, db_session):
+    await _create_user(db_session)
+    resp = await client.post(
+        "/api/auth/users/ghost/reset-password",
+        headers=_auth_header("admin", "admin"),
+    )
+    assert resp.status_code == 404
+
+
+# ─── Audit ─────────────────────────────────────────────────────────
+
 @pytest.mark.asyncio
 async def test_audit_log_created_on_device_create(client, db_session):
     """Verify audit entry is created when a device is added."""

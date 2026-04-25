@@ -9,6 +9,9 @@ require_role      — factory returning a dependency for role-based access.
 require_auth      — any authenticated user, used by /verify.
 """
 
+import secrets
+import string
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import (
     APIKeyCookie,
@@ -16,7 +19,7 @@ from fastapi.security import (
     HTTPBearer,
 )
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fleet_server.database import get_db
@@ -70,6 +73,34 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class UserUpdate(BaseModel):
+    role: str | None = None
+    is_active: bool | None = None
+
+
+class PasswordResetResponse(BaseModel):
+    id: str
+    password: str
+
+
+VALID_ROLES = {"admin", "operator", "viewer"}
+
+
+def _generate_password(length: int = 16) -> str:
+    """URL-safe random password — letters, digits, dashes, underscores."""
+    alphabet = string.ascii_letters + string.digits + "-_"
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+async def _count_active_admins(db: AsyncSession) -> int:
+    result = await db.execute(
+        select(func.count())
+        .select_from(User)
+        .where(User.role == "admin", User.is_active == True)  # noqa: E712
+    )
+    return int(result.scalar_one())
 
 
 # ─── Dependencies ───────────────────────────────────────────────────
@@ -268,3 +299,104 @@ async def create_user(
 @router.get("/me", response_model=UserResponse)
 async def get_me(user: User = Depends(require_role("admin", "operator", "viewer"))):
     return user
+
+
+@router.get("/users", response_model=list[UserResponse])
+async def list_users(
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_role("admin")),
+):
+    """List all users — admin only."""
+    result = await db.execute(select(User).order_by(User.created_at.desc()))
+    return list(result.scalars().all())
+
+
+@router.patch("/users/{user_id}", response_model=UserResponse)
+async def update_user(
+    user_id: str,
+    payload: UserUpdate,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
+):
+    """Update role and/or is_active — admin only.
+
+    Guards:
+      - Cannot demote or deactivate yourself (lockout protection).
+      - Cannot leave the system with zero active admins.
+    """
+    if payload.role is None and payload.is_active is None:
+        raise HTTPException(status_code=400, detail="Nothing to update")
+
+    if payload.role is not None and payload.role not in VALID_ROLES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid role. Must be one of: {sorted(VALID_ROLES)}",
+        )
+
+    target = await db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if target.id == admin.id:
+        raise HTTPException(
+            status_code=400,
+            detail="You cannot change your own role or active status",
+        )
+
+    new_role = payload.role if payload.role is not None else target.role
+    new_active = payload.is_active if payload.is_active is not None else target.is_active
+
+    would_lose_last_admin = (
+        target.role == "admin"
+        and target.is_active
+        and (new_role != "admin" or not new_active)
+    )
+    if would_lose_last_admin and await _count_active_admins(db) <= 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot leave the system without at least one active admin",
+        )
+
+    changes: dict = {}
+    if payload.role is not None and payload.role != target.role:
+        changes["role"] = {"from": target.role, "to": payload.role}
+        target.role = payload.role
+    if payload.is_active is not None and payload.is_active != target.is_active:
+        changes["is_active"] = {"from": target.is_active, "to": payload.is_active}
+        target.is_active = payload.is_active
+
+    await db.commit()
+    await db.refresh(target)
+
+    if changes:
+        audit = AuditService(db, user_id=admin.id)
+        await audit.log("update", "user", {"target_user": target.id, **changes})
+
+    return target
+
+
+@router.post(
+    "/users/{user_id}/reset-password", response_model=PasswordResetResponse
+)
+async def reset_user_password(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
+):
+    """Generate a new password for the user — admin only.
+
+    Returns the plaintext password ONCE. Surface it in the UI immediately
+    and never store it; bcrypt hash is what lands in the DB.
+    """
+    target = await db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    new_pw = _generate_password()
+    target.hashed_password = hash_password(new_pw)
+    await db.commit()
+
+    audit = AuditService(db, user_id=admin.id)
+    await audit.log("reset_password", "user", {"target_user": target.id})
+
+    return PasswordResetResponse(id=target.id, password=new_pw)
