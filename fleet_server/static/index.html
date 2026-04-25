@@ -78,6 +78,13 @@
     .bar-row .bar { flex: 1; height: 8px; border-radius: 4px; background: var(--bg); position: relative; overflow: hidden; }
     .bar-row .bar-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); border-radius: 4px; }
     .bar-row .count { flex: 0 0 28px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .donut-wrap { display: flex; align-items: center; gap: 1rem; }
+    .legend { font-size: 0.85rem; flex: 1; }
+    .legend .item { display: flex; align-items: center; gap: 0.5rem; margin: 0.3rem 0; }
+    .legend .swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+    .legend .label { flex: 1; color: var(--text); }
+    .legend .count { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .legend .pct { color: var(--muted); font-size: 0.78rem; min-width: 38px; text-align: right; }
     @media (max-width: 800px) {
       .kpi-strip { grid-template-columns: repeat(2, 1fr); }
       .breakdown { grid-template-columns: 1fr; }
@@ -254,12 +261,19 @@
       <div class="breakdown">
         <div class="card">
           <h2>Status distribution</h2>
-          <div id="statusBreakdown"></div>
+          <div class="donut-wrap">
+            <div id="statusDonut"></div>
+            <div id="statusLegend" class="legend"></div>
+          </div>
         </div>
         <div class="card">
           <h2>Firmware distribution</h2>
           <div id="versionBreakdown"></div>
         </div>
+      </div>
+      <div class="card" style="margin-bottom:1rem">
+        <h2 style="font-size:0.85rem; color:var(--muted); margin:0 0 0.6rem">Devices per home</h2>
+        <div id="homeBreakdown"></div>
       </div>
       <div class="card">
         <h2>Devices <span id="devCount" class="count"></span></h2>
@@ -566,18 +580,12 @@ $('loginForm').addEventListener('submit', async e => {
 });
 
 $('logoutBtn').addEventListener('click', async () => {
-  // 1) Ask Grafana to drop its own session cookie too.
-  try { await fetch('/grafana/logout', { method: 'POST', credentials: 'include' }); } catch {}
-  // 2) Our server clears mdm_session AND sends Clear-Site-Data to wipe
-  //    cookies/storage/cache for the whole origin.
+  // /api/auth/logout clears mdm_session AND sends Clear-Site-Data,
+  // which wipes EVERY cookie/storage entry for this origin — including
+  // any leftover Grafana session — in one go. No /grafana/ ping needed.
   try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); } catch {}
   localStorage.clear();
-  // 3) Break out of the Grafana iframe with a replace() — no back-button
-  //    resurrecting the signed-in page.
-  try {
-    const top = (window.top !== window.self) ? window.top : window;
-    top.location.replace('/admin/');
-  } catch { window.location.replace('/admin/'); }
+  window.location.replace('/admin/');
 });
 
 // Embedded mode — hide outer chrome when rendered inside Grafana iframe.
@@ -1132,8 +1140,6 @@ async function loadEvents() {
 }
 
 async function loadDeviceStats() {
-  // Pull all devices once (small fleet — fine to count client-side)
-  // and derive the KPI tiles + status/firmware breakdowns.
   let devices;
   try {
     const r = await api('/api/devices/?limit=10000');
@@ -1143,11 +1149,14 @@ async function loadDeviceStats() {
   const total = devices.length;
   const byStatus = { alive: 0, dead: 0, unknown: 0 };
   const byVersion = {};
+  const byHome = {};
   for (const d of devices) {
     const s = (d.status || 'unknown').toLowerCase();
     byStatus[s] = (byStatus[s] || 0) + 1;
     const v = d.firmware_version || '—';
     byVersion[v] = (byVersion[v] || 0) + 1;
+    const h = d.home_id || '(unassigned)';
+    byHome[h] = (byHome[h] || 0) + 1;
   }
 
   $('kpiTotal').textContent = total;
@@ -1155,12 +1164,57 @@ async function loadDeviceStats() {
   $('kpiDead').textContent = byStatus.dead || 0;
   $('kpiUnknown').textContent = byStatus.unknown || 0;
 
-  $('statusBreakdown').innerHTML = renderBars(byStatus, total);
-  // Firmware: sort versions descending, top 6
-  const versionEntries = Object.entries(byVersion)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6);
+  // Status donut + legend
+  const statusData = [
+    ['Alive', byStatus.alive || 0, '#10b981'],
+    ['Dead', byStatus.dead || 0, '#ef4444'],
+    ['Unknown', byStatus.unknown || 0, '#f59e0b'],
+  ];
+  $('statusDonut').innerHTML = svgDonut(statusData, total);
+  $('statusLegend').innerHTML = renderLegend(statusData, total);
+
+  // Firmware distribution: top 6 versions sorted by count
+  const versionEntries = Object.entries(byVersion).sort((a, b) => b[1] - a[1]).slice(0, 6);
   $('versionBreakdown').innerHTML = renderBars(Object.fromEntries(versionEntries), total);
+
+  // Devices per home: sorted by count desc
+  const homeEntries = Object.entries(byHome).sort((a, b) => b[1] - a[1]);
+  $('homeBreakdown').innerHTML = renderBars(Object.fromEntries(homeEntries), total);
+}
+
+function svgDonut(data, total, size = 140, stroke = 22) {
+  const r = (size - stroke) / 2;
+  const cx = size / 2, cy = size / 2;
+  const C = 2 * Math.PI * r;
+  let acc = 0;
+  const arcs = data.filter(([, n]) => n > 0).map(([label, n, color]) => {
+    const dash = total > 0 ? (n / total) * C : 0;
+    const offset = total > 0 ? (acc / total) * C : 0;
+    acc += n;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}"
+      stroke-width="${stroke}" stroke-dasharray="${dash} ${C}"
+      stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;
+  }).join('');
+  const ring = total === 0
+    ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#e5e7eb" stroke-width="${stroke}"/>`
+    : '';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    ${ring}${arcs}
+    <text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="22" font-weight="700" fill="#1f2937">${total}</text>
+    <text x="${cx}" y="${cy + 16}" text-anchor="middle" font-size="9" fill="#6b7280" letter-spacing="1">DEVICES</text>
+  </svg>`;
+}
+
+function renderLegend(data, total) {
+  return data.map(([label, n, color]) => {
+    const pct = total > 0 ? Math.round((n / total) * 100) : 0;
+    return `<div class="item">
+      <span class="swatch" style="background:${color}"></span>
+      <span class="label">${escapeHtml(label)}</span>
+      <span class="count">${n}</span>
+      <span class="pct">${pct}%</span>
+    </div>`;
+  }).join('');
 }
 
 function renderBars(counts, total) {
@@ -1504,9 +1558,7 @@ async function boot() {
       localStorage.setItem(EMAIL_KEY, u.email);
       localStorage.setItem(ROLE_KEY, u.role);
       if (!localStorage.getItem(TOKEN_KEY)) localStorage.setItem(TOKEN_KEY, 'cookie');
-      // Already authed + standalone /admin/? Punt them to the unified
-      // view so /admin/ behaves like a login-only page.
-      if (!EMBEDDED) { window.location.href = '/grafana/'; return; }
+      // Already authed — stay on /admin/ (the primary shell now).
       showApp();
       return;
     }
