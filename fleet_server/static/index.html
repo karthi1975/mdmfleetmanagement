@@ -23,7 +23,7 @@
     }
     header h1 { margin: 0; font-size: 1.1rem; }
     header .who { color: var(--muted); font-size: 0.9rem; }
-    header button { background: none; border: 1px solid var(--border); padding: 0.3rem 0.7rem; border-radius: 6px; cursor: pointer; }
+    header button { background: none; border: 1px solid var(--border); padding: 0.3rem 0.7rem; border-radius: 6px; cursor: pointer; margin-left: 0.5rem; }
     main { max-width: 1100px; margin: 1.5rem auto; padding: 0 1.25rem; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
@@ -156,6 +156,7 @@
     <h1>SmartHome Fleet Admin</h1>
     <div>
       <span class="who" id="who"></span>
+      <button id="changePwBtn" type="button">Change password</button>
       <button id="logoutBtn">Sign out</button>
     </div>
   </header>
@@ -334,6 +335,30 @@
     <div class="modal-actions">
       <button type="button" id="addUserCancel" class="small">Cancel</button>
       <button type="button" id="addUserSave" class="primary">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Change my password (any authenticated user) -->
+<div id="changePwModal" class="modal-backdrop" hidden>
+  <div class="modal">
+    <h3>Change your password</h3>
+    <div class="row">
+      <label for="currentPw">Current password</label>
+      <input type="password" id="currentPw" autocomplete="current-password" />
+    </div>
+    <div class="row">
+      <label for="newPw">New password (min 8 characters)</label>
+      <input type="password" id="newPw" autocomplete="new-password" />
+    </div>
+    <div class="row">
+      <label for="confirmPw">Confirm new password</label>
+      <input type="password" id="confirmPw" autocomplete="new-password" />
+    </div>
+    <div id="changePwMsg" class="msg err" hidden></div>
+    <div class="modal-actions">
+      <button type="button" id="changePwCancel" class="small">Cancel</button>
+      <button type="button" id="changePwSave" class="primary">Update</button>
     </div>
   </div>
 </div>
@@ -1128,6 +1153,43 @@ function generatePassword(len = 16) {
   crypto.getRandomValues(arr);
   return Array.from(arr, n => alphabet[n % alphabet.length]).join('');
 }
+
+// ── Change my own password (any role) ─────────────────────────────
+$('changePwBtn').addEventListener('click', () => {
+  $('currentPw').value = '';
+  $('newPw').value = '';
+  $('confirmPw').value = '';
+  $('changePwMsg').hidden = true;
+  $('changePwModal').hidden = false;
+  setTimeout(() => $('currentPw').focus(), 50);
+});
+$('changePwCancel').addEventListener('click', () => { $('changePwModal').hidden = true; });
+$('changePwSave').addEventListener('click', async () => {
+  const current = $('currentPw').value;
+  const next = $('newPw').value;
+  const confirm = $('confirmPw').value;
+  const msg = $('changePwMsg');
+  msg.hidden = true;
+  if (!current || !next) {
+    msg.hidden = false; msg.textContent = 'Fill in both password fields'; return;
+  }
+  if (next.length < 8) {
+    msg.hidden = false; msg.textContent = 'New password must be at least 8 characters'; return;
+  }
+  if (next !== confirm) {
+    msg.hidden = false; msg.textContent = 'New password and confirmation do not match'; return;
+  }
+  try {
+    await api('/api/auth/me/password', {
+      method: 'POST',
+      body: JSON.stringify({ current_password: current, new_password: next }),
+    });
+    $('changePwModal').hidden = true;
+    alert('Password updated. Use the new one next time you sign in.');
+  } catch (err) {
+    msg.hidden = false; msg.textContent = err.message;
+  }
+});
 
 $('otaStrategy').addEventListener('change', e => {
   $('canaryRow').hidden = e.target.value !== 'canary';

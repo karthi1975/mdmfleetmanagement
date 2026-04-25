@@ -85,6 +85,14 @@ class PasswordResetResponse(BaseModel):
     password: str
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+MIN_PASSWORD_LENGTH = 8
+
+
 VALID_ROLES = {"admin", "operator", "viewer"}
 
 
@@ -299,6 +307,36 @@ async def create_user(
 @router.get("/me", response_model=UserResponse)
 async def get_me(user: User = Depends(require_role("admin", "operator", "viewer"))):
     return user
+
+
+@router.post("/me/password")
+async def change_my_password(
+    payload: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """Change your own password. Requires the current password."""
+    if not verify_password(payload.current_password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+    if len(payload.new_password) < MIN_PASSWORD_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"New password must be at least {MIN_PASSWORD_LENGTH} characters",
+        )
+
+    if payload.new_password == payload.current_password:
+        raise HTTPException(
+            status_code=400, detail="New password must differ from current password"
+        )
+
+    user.hashed_password = hash_password(payload.new_password)
+    await db.commit()
+
+    audit = AuditService(db, user_id=user.id)
+    await audit.log("change_password", "user", {"self": True})
+
+    return {"ok": True}
 
 
 @router.get("/users", response_model=list[UserResponse])

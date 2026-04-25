@@ -281,6 +281,71 @@ async def test_reset_password_user_not_found(client, db_session):
     assert resp.status_code == 404
 
 
+# ─── Self-service password change ───────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_change_my_password_success(client, db_session):
+    await _create_user(db_session, user_id="op1", email="op1@test.com", role="operator")
+    resp = await client.post(
+        "/api/auth/me/password",
+        json={"current_password": "password123", "new_password": "newpass456"},
+        headers=_auth_header("op1", "operator"),
+    )
+    assert resp.status_code == 200
+
+    # New password works for login; old one no longer does
+    login = await client.post("/api/auth/login", json={
+        "email": "op1@test.com", "password": "newpass456",
+    })
+    assert login.status_code == 200
+    old_login = await client.post("/api/auth/login", json={
+        "email": "op1@test.com", "password": "password123",
+    })
+    assert old_login.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_change_my_password_wrong_current(client, db_session):
+    await _create_user(db_session, user_id="op1", email="op1@test.com", role="operator")
+    resp = await client.post(
+        "/api/auth/me/password",
+        json={"current_password": "wrong", "new_password": "newpass456"},
+        headers=_auth_header("op1", "operator"),
+    )
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_change_my_password_too_short(client, db_session):
+    await _create_user(db_session, user_id="op1", email="op1@test.com", role="operator")
+    resp = await client.post(
+        "/api/auth/me/password",
+        json={"current_password": "password123", "new_password": "short"},
+        headers=_auth_header("op1", "operator"),
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_change_my_password_same_as_current(client, db_session):
+    await _create_user(db_session, user_id="op1", email="op1@test.com", role="operator")
+    resp = await client.post(
+        "/api/auth/me/password",
+        json={"current_password": "password123", "new_password": "password123"},
+        headers=_auth_header("op1", "operator"),
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_change_my_password_unauthenticated(client):
+    resp = await client.post(
+        "/api/auth/me/password",
+        json={"current_password": "x", "new_password": "newpass456"},
+    )
+    assert resp.status_code == 401
+
+
 # ─── Audit ─────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
