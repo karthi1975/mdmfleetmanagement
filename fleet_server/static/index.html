@@ -54,19 +54,49 @@
       gap: 0.75rem; margin-bottom: 1rem;
     }
     .kpi-tile {
+      position: relative; overflow: hidden;
       background: var(--card); border: 1px solid var(--border);
       border-radius: 10px; padding: 0.9rem 1rem;
+      display: flex; align-items: center; gap: 0.85rem;
     }
+    .kpi-tile::before {
+      content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+      background: var(--accent); opacity: 0.7;
+    }
+    .kpi-tile.kpi-ok::before  { background: var(--ok); }
+    .kpi-tile.kpi-err::before { background: var(--err); }
+    .kpi-tile.kpi-warn::before { background: var(--warn); }
+    .kpi-icon {
+      flex-shrink: 0; width: 38px; height: 38px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 9px; background: #eef2ff; color: var(--accent);
+    }
+    .kpi-tile.kpi-ok  .kpi-icon { background: #d1fae5; color: var(--ok); }
+    .kpi-tile.kpi-err .kpi-icon { background: #fee2e2; color: var(--err); }
+    .kpi-tile.kpi-warn .kpi-icon { background: #fef3c7; color: var(--warn); }
+    .kpi-icon svg { width: 22px; height: 22px; }
+    .kpi-body { flex: 1; min-width: 0; }
     .kpi-label {
       font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em;
       color: var(--muted); font-weight: 600;
     }
     .kpi-value {
-      font-size: 1.6rem; font-weight: 700; margin-top: 0.2rem;
+      font-size: 1.6rem; font-weight: 700; line-height: 1.1; margin-top: 0.15rem;
     }
     .kpi-value.ok { color: var(--ok); }
     .kpi-value.err { color: var(--err); }
     .kpi-value.warn { color: var(--warn); }
+    .kpi-sub { font-size: 0.72rem; color: var(--muted); margin-top: 0.2rem; }
+    .pulse-dot {
+      display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+      background: currentColor; margin-right: 0.35rem; vertical-align: middle;
+      box-shadow: 0 0 0 0 currentColor; animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0.6); }
+      70%  { box-shadow: 0 0 0 7px rgba(16,185,129,0); }
+      100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+    }
     .breakdown {
       display: grid; grid-template-columns: 1fr 1fr;
       gap: 0.75rem; margin-bottom: 1rem;
@@ -253,10 +283,46 @@
   <main>
     <section data-page="devices">
       <div class="kpi-strip">
-        <div class="kpi-tile"><div class="kpi-label">Total devices</div><div class="kpi-value" id="kpiTotal">—</div></div>
-        <div class="kpi-tile"><div class="kpi-label">Alive</div><div class="kpi-value ok" id="kpiAlive">—</div></div>
-        <div class="kpi-tile"><div class="kpi-label">Dead</div><div class="kpi-value err" id="kpiDead">—</div></div>
-        <div class="kpi-tile"><div class="kpi-label">Unknown</div><div class="kpi-value warn" id="kpiUnknown">—</div></div>
+        <div class="kpi-tile">
+          <div class="kpi-icon" title="Total devices">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          </div>
+          <div class="kpi-body">
+            <div class="kpi-label">Total devices</div>
+            <div class="kpi-value" id="kpiTotal">—</div>
+            <div class="kpi-sub" id="kpiTotalSub">in fleet</div>
+          </div>
+        </div>
+        <div class="kpi-tile kpi-ok">
+          <div class="kpi-icon" title="Alive">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div class="kpi-body">
+            <div class="kpi-label">Alive</div>
+            <div class="kpi-value ok" id="kpiAlive">—</div>
+            <div class="kpi-sub" id="kpiAliveSub"><span class="pulse-dot" style="color:#10b981"></span>online</div>
+          </div>
+        </div>
+        <div class="kpi-tile kpi-err">
+          <div class="kpi-icon" title="Dead">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </div>
+          <div class="kpi-body">
+            <div class="kpi-label">Dead</div>
+            <div class="kpi-value err" id="kpiDead">—</div>
+            <div class="kpi-sub" id="kpiDeadSub">offline &gt; 5 min</div>
+          </div>
+        </div>
+        <div class="kpi-tile kpi-warn">
+          <div class="kpi-icon" title="Unknown">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.1 9.1a3 3 0 0 1 5.7 1.4c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div class="kpi-body">
+            <div class="kpi-label">Unknown</div>
+            <div class="kpi-value warn" id="kpiUnknown">—</div>
+            <div class="kpi-sub" id="kpiUnknownSub">no recent ping</div>
+          </div>
+        </div>
       </div>
       <div class="breakdown">
         <div class="card">
@@ -1140,11 +1206,16 @@ async function loadEvents() {
 }
 
 async function loadDeviceStats() {
+  // /api/devices/ caps `limit` at 500 — matches small/mid fleets.
+  // For 500+ devices, swap to a dedicated /api/devices/stats endpoint.
   let devices;
   try {
-    const r = await api('/api/devices/?limit=10000');
+    const r = await api('/api/devices/?limit=500');
     devices = Array.isArray(r) ? r : (r.items || r.devices || r.results || []);
-  } catch { return; }
+  } catch (err) {
+    console.error('loadDeviceStats failed:', err.message);
+    return;
+  }
 
   const total = devices.length;
   const byStatus = { alive: 0, dead: 0, unknown: 0 };
@@ -1159,10 +1230,15 @@ async function loadDeviceStats() {
     byHome[h] = (byHome[h] || 0) + 1;
   }
 
+  const pct = (n) => total > 0 ? Math.round((n / total) * 100) : 0;
   $('kpiTotal').textContent = total;
+  $('kpiTotalSub').textContent = total === 0 ? 'no devices yet' : `across ${Object.keys(byHome).length} home(s)`;
   $('kpiAlive').textContent = byStatus.alive || 0;
+  $('kpiAliveSub').innerHTML = `<span class="pulse-dot" style="color:#10b981"></span>${pct(byStatus.alive)}% of fleet`;
   $('kpiDead').textContent = byStatus.dead || 0;
+  $('kpiDeadSub').textContent = total === 0 ? '—' : `${pct(byStatus.dead)}% offline`;
   $('kpiUnknown').textContent = byStatus.unknown || 0;
+  $('kpiUnknownSub').textContent = total === 0 ? '—' : `${pct(byStatus.unknown)}% no recent ping`;
 
   // Status donut + legend
   const statusData = [
