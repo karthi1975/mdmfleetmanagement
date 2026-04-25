@@ -18,8 +18,12 @@ from fleet_server.models.scheduled_rollout import ScheduledRollout
 
 logger = logging.getLogger(__name__)
 
-DEAD_THRESHOLD_SECONDS = 90
-CHECK_INTERVAL_SECONDS = 60
+# Heartbeats arrive every 30 s by default (FleetClient::heartbeatIntervalMs_).
+# Threshold = 2 missed beats so a single network blip doesn't flip a device
+# to "dead". Sweep runs twice per minute for fast UI feedback.
+# Worst-case detection time: 60 s threshold + 30 s sweep = 90 s.
+DEAD_THRESHOLD_SECONDS = 60
+CHECK_INTERVAL_SECONDS = 30
 
 scheduler = AsyncIOScheduler()
 

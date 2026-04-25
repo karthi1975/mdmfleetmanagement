@@ -136,7 +136,7 @@ async def test_heartbeat_partial_payload(db_session):
 
 @pytest.mark.asyncio
 async def test_dead_device_detection(db_session):
-    """Device with last_seen > 90s ago should be marked dead."""
+    """Device with last_seen older than DEAD_THRESHOLD_SECONDS should be marked dead."""
     old_time = datetime.now(timezone.utc) - timedelta(seconds=120)
     device = Device(
         device_id="esp32-dying",
