@@ -48,6 +48,29 @@
     .sidenav .nav-group { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 0.8rem 1.1rem 0.3rem; font-weight: 600; }
     section[data-page] { display: none; }
     section[data-page].active { display: block; }
+    /* Grafana chart embeds at top of Devices page */
+    .charts-strip {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem; margin-bottom: 0.75rem;
+    }
+    .charts-strip iframe {
+      height: 110px; width: 100%; border: 0; border-radius: 8px;
+      background: var(--card);
+    }
+    .charts-pies {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 0.75rem; margin-bottom: 1rem;
+    }
+    .charts-pies iframe {
+      height: 220px; width: 100%; border: 0; border-radius: 8px;
+      background: var(--card);
+    }
+    @media (max-width: 800px) {
+      .charts-strip { grid-template-columns: repeat(2, 1fr); }
+      .charts-pies { grid-template-columns: 1fr; }
+    }
+    /* Don't show charts when /admin/ is itself embedded inside Grafana */
+    .embedded .charts-strip, .embedded .charts-pies { display: none; }
     /* Embedded (Grafana iframe) — hide sidenav, render single page */
     .embedded .app-shell { display: block; min-height: 0; }
     .embedded .sidenav { display: none; }
@@ -209,6 +232,16 @@
 
   <main>
     <section data-page="devices">
+      <div class="charts-strip">
+        <iframe src="/grafana/d-solo/fleet-overview/_?orgId=1&panelId=2&theme=light&refresh=30s" title="Total Devices"></iframe>
+        <iframe src="/grafana/d-solo/fleet-overview/_?orgId=1&panelId=3&theme=light&refresh=30s" title="Alive"></iframe>
+        <iframe src="/grafana/d-solo/fleet-overview/_?orgId=1&panelId=4&theme=light&refresh=30s" title="Dead"></iframe>
+        <iframe src="/grafana/d-solo/fleet-overview/_?orgId=1&panelId=5&theme=light&refresh=30s" title="Unknown"></iframe>
+      </div>
+      <div class="charts-pies">
+        <iframe src="/grafana/d-solo/fleet-overview/_?orgId=1&panelId=6&theme=light&refresh=30s" title="Status Distribution"></iframe>
+        <iframe src="/grafana/d-solo/fleet-overview/_?orgId=1&panelId=7&theme=light&refresh=30s" title="Firmware Distribution"></iframe>
+      </div>
       <div class="card">
         <h2>Devices <span id="devCount" class="count"></span></h2>
         <table id="devTable"><thead>
