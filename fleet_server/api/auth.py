@@ -95,6 +95,19 @@ MIN_PASSWORD_LENGTH = 8
 
 VALID_ROLES = {"admin", "operator", "viewer"}
 
+# Protected accounts can only be modified by themselves. Other admins
+# cannot reset their password, change their role, or deactivate them.
+# The seed `admin` account is the system root and must always be reachable.
+PROTECTED_USER_IDS = frozenset({"admin"})
+
+
+def _check_not_protected(target_id: str, actor_id: str) -> None:
+    if target_id in PROTECTED_USER_IDS and target_id != actor_id:
+        raise HTTPException(
+            status_code=403,
+            detail=f"User '{target_id}' is protected; only the account owner can modify it.",
+        )
+
 
 def _generate_password(length: int = 16) -> str:
     """URL-safe random password — letters, digits, dashes, underscores."""
@@ -375,6 +388,8 @@ async def update_user(
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
 
+    _check_not_protected(target.id, admin.id)
+
     if target.id == admin.id:
         raise HTTPException(
             status_code=400,
@@ -429,6 +444,8 @@ async def reset_user_password(
     target = await db.get(User, user_id)
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
+
+    _check_not_protected(target.id, admin.id)
 
     new_pw = _generate_password()
     target.hashed_password = hash_password(new_pw)

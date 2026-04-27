@@ -1328,6 +1328,7 @@ async function refresh() {
 }
 
 // ── Users management (admin only) ─────────────────────────────────
+const PROTECTED_USER_IDS = new Set(['admin']);   // matches server-side guard
 function isAdmin() { return localStorage.getItem(ROLE_KEY) === 'admin'; }
 function currentUserId() { return localStorage.getItem(EMAIL_KEY) || ''; }
 
@@ -1346,24 +1347,34 @@ async function loadUsers() {
   const myEmail = currentUserId();
   tbody.innerHTML = users.map(u => {
     const isSelf = u.email === myEmail || u.id === myEmail;
+    const isProtected = PROTECTED_USER_IDS.has(u.id);
+    const idCell = isProtected
+      ? `<code>${escapeHtml(u.id)}</code> <span title="Protected account — only the owner can modify it" style="color:var(--muted);margin-left:0.3rem">🔒</span>`
+      : `<code>${escapeHtml(u.id)}</code>`;
     const statusPill = u.is_active
       ? '<span class="pill-active">active</span>'
       : '<span class="pill-inactive">inactive</span>';
-    const roleSelect = isSelf
+    const roleLocked = isSelf || (isProtected && !isSelf);
+    const roleSelect = roleLocked
       ? `<span class="role-tag">${escapeHtml(u.role)}</span>`
       : `<select class="role-select" data-id="${escapeAttr(u.id)}" onchange="changeRole(this)">
           ${['admin','operator','viewer'].map(r =>
             `<option value="${r}" ${r === u.role ? 'selected' : ''}>${r}</option>`
           ).join('')}
          </select>`;
-    const actions = isSelf
-      ? '<span style="color:var(--muted);font-size:0.8rem">(you)</span>'
-      : `<div class="row-actions">
+    let actions;
+    if (isSelf) {
+      actions = '<span style="color:var(--muted);font-size:0.8rem">(you)</span>';
+    } else if (isProtected) {
+      actions = '<span style="color:var(--muted);font-size:0.8rem">🔒 protected</span>';
+    } else {
+      actions = `<div class="row-actions">
           <button class="small" onclick="resetPassword('${escapeAttr(u.id)}')">Reset PW</button>
           <button class="small" onclick="toggleActive('${escapeAttr(u.id)}', ${!u.is_active})">${u.is_active ? 'Deactivate' : 'Activate'}</button>
          </div>`;
+    }
     return `<tr>
-      <td><code>${escapeHtml(u.id)}</code></td>
+      <td>${idCell}</td>
       <td>${escapeHtml(u.email)}</td>
       <td>${roleSelect}</td>
       <td>${statusPill}</td>

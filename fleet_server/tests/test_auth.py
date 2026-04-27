@@ -281,6 +281,48 @@ async def test_reset_password_user_not_found(client, db_session):
     assert resp.status_code == 404
 
 
+# ─── Protected account ──────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_patch_protected_user_blocked_for_other_admin(client, db_session):
+    """The seed `admin` account cannot be modified by a different admin."""
+    await _create_user(db_session)  # id=admin
+    await _create_user(db_session, user_id="a2", email="a2@test.com", role="admin")
+
+    resp = await client.patch(
+        "/api/auth/users/admin",
+        json={"role": "viewer"},
+        headers=_auth_header("a2", "admin"),
+    )
+    assert resp.status_code == 403
+    assert "protected" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_reset_protected_user_password_blocked(client, db_session):
+    """Other admins cannot reset the seed admin's password."""
+    await _create_user(db_session)
+    await _create_user(db_session, user_id="a2", email="a2@test.com", role="admin")
+
+    resp = await client.post(
+        "/api/auth/users/admin/reset-password",
+        headers=_auth_header("a2", "admin"),
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_protected_user_can_change_own_password(client, db_session):
+    """The protected admin can still change their own password via /me/password."""
+    await _create_user(db_session)
+    resp = await client.post(
+        "/api/auth/me/password",
+        json={"current_password": "password123", "new_password": "newpass456"},
+        headers=_auth_header("admin", "admin"),
+    )
+    assert resp.status_code == 200
+
+
 # ─── Self-service password change ───────────────────────────────────
 
 @pytest.mark.asyncio
